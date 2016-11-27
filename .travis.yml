@@ -3,10 +3,7 @@ language: ruby
 rvm:
   - 2.1
   - 2.2
-  - 2.3
-
-before_install:
-  - gem update bundler
+  - 2.3.0
 
 before_install:
   - gem update bundler

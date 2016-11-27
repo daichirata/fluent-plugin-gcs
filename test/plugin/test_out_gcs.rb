@@ -215,7 +215,6 @@ class GCSOutputTest < Test::Unit::TestCase
       storage.bucket { bucket }
       stub(Google::Cloud::Storage).new { storage }
 
-
       driver = create_driver(conf)
       driver.emit({"a"=>1}, Time.parse("2016-01-01 15:00:00 UTC").to_i)
       driver.run
@@ -301,8 +300,8 @@ class GCSOutputTest < Test::Unit::TestCase
       check_upload(conf, "log/20160101_0.json", enc_opts, upload_opts)
     end
 
-    def test_write_with_localtime
-      conf = config(CONFIG.gsub("utc", "localtime"))
+    def test_write_with_utc
+      conf = config(CONFIG)
 
       enc_opts = {
         encryption_key: nil,
@@ -318,7 +317,9 @@ class GCSOutputTest < Test::Unit::TestCase
         encryption_key_sha256: nil
       }.merge(enc_opts)
 
-      check_upload(conf, "log/20160102_0.gz", enc_opts, upload_opts)
+      Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
+        check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      end
     end
 
     def test_write_with_encryption

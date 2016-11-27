@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["hirata.daichi@gmail.com"]
   spec.summary       = "Google Cloud Storage output plugin for Fluentd"
   spec.description   = "Google Cloud Storage output plugin for Fluentd"
-  spec.homepage      = "https://github.com/daishirata/fluent-plugin-gcs"
+  spec.homepage      = "https://github.com/daichirata/fluent-plugin-gcs"
   spec.license       = "Apache-2.0"
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|

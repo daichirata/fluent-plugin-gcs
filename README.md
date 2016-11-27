@@ -1,5 +1,5 @@
 # fluent-plugin-gcs
-<!-- TODO: travis, codeclimate, rubygems -->
+[![Build Status](https://travis-ci.org/daichirata/fluent-plugin-gcs.svg?branch=master)](https://travis-ci.org/daichirata/fluent-plugin-gcs)[![Code Climate](https://codeclimate.com/github/daichirata/fluent-plugin-gcs/badges/gpa.svg)](https://codeclimate.com/github/daichirata/fluent-plugin-gcs)
 
 Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluentd).
 

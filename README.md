@@ -17,8 +17,8 @@ gem install fluent-plugin-gcs
 
   project YOUR_PROJECT
   keyfile YOUR_KEYFILE_PATH
-  gcs_bucket YOUR_GCS_BUCKET_NAME
-  gcs_object_key_format %{path}%{time_slice}_%{index}.%{file_extension}
+  bucket YOUR_GCS_BUCKET_NAME
+  object_key_format %{path}%{time_slice}_%{index}.%{file_extension}
   path logs/
   buffer_path /var/log/fluent/gcs
 

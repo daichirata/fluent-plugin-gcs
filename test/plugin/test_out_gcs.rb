@@ -392,7 +392,7 @@ class GCSOutputTest < Test::Unit::TestCase
     end
 
     def test_write_with_custom_object_key_format
-      conf = config(CONFIG, "object_key_format %{path}%{file_extension}/%{hex_random}/%{index}/%{time_slice}/%{uuid_flush}")
+      conf = config(CONFIG, "object_key_format %{path}%{file_extension}/%{hex_random}/%{hostname}/%{index}/%{time_slice}/%{uuid_flush}")
 
       enc_opts = {
         encryption_key: nil,
@@ -414,11 +414,12 @@ class GCSOutputTest < Test::Unit::TestCase
       end
       mock(SecureRandom).uuid { "uuid1" }
       mock(SecureRandom).uuid { "uuid2" }
+      mock(Socket).gethostname.any_number_of_times { "test-hostname" }
 
       check_upload(conf) do |bucket|
         bucket.find_file(anything, enc_opts) { true }
         bucket.find_file(anything, enc_opts) { false }
-        bucket.upload_file(anything, "log/gz/6908/1/20160101/uuid2", upload_opts.merge(enc_opts))
+        bucket.upload_file(anything, "log/gz/6908/test-hostname/1/20160101/uuid2", upload_opts.merge(enc_opts))
       end
     end
 

@@ -85,6 +85,7 @@ The format of GCS object keys. You can use several built-in variables:
 * %{file_extension}
 * %{uuid_flush}
 * %{hex_random}
+* %{hostname}
 
 to decide keys dynamically.
 
@@ -97,6 +98,7 @@ to decide keys dynamically.
   * text - txt
 * `%{uuid_flush}` a uuid that is replaced everytime the buffer will be flushed
 * `%{hex_random}` a random hex string that is replaced for each buffer chunk, not assured to be unique.
+* `%{hostname}` is set to the standard host name of the system of the running server.
 You can configure the length of string with a `hex_random_length` parameter (Default: 4).
 
 The default format is `%{path}%{time_slice}_%{index}.%{file_extension}`.

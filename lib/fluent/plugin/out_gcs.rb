@@ -1,5 +1,6 @@
-require "securerandom"
 require "digest"
+require "securerandom"
+require "socket"
 
 require "fluent/plugin/gcs/object_creator"
 require "fluent/plugin/gcs/version"
@@ -140,6 +141,7 @@ module Fluent
       tags = {
         "%{file_extension}" => @object_creator.file_extension,
         "%{hex_random}" => hex_random(chunk),
+        "%{hostname}" => Socket.gethostname,
         "%{index}" => i,
         "%{path}" => format_path(chunk),
         "%{time_slice}" => chunk.key,

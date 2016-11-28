@@ -412,9 +412,9 @@ class GCSOutputTest < Test::Unit::TestCase
         # Memo: Digest::MD5.hexdigest("unique_id") => "69080cee5b6d4c35a8bbf5c48335fe08"
         stub(b).unique_id { "unique_id" }
       end
-      mock(SecureRandom).uuid { "uuid1" }
-      mock(SecureRandom).uuid { "uuid2" }
-      mock(Socket).gethostname.any_number_of_times { "test-hostname" }
+      stub(SecureRandom).uuid { "uuid1" }
+      stub(SecureRandom).uuid { "uuid2" }
+      stub(Socket).gethostname { "test-hostname" }
 
       check_upload(conf) do |bucket|
         bucket.find_file(anything, enc_opts) { true }

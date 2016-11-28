@@ -1,4 +1,4 @@
-require "digest"
+require "digest/md5"
 require "securerandom"
 require "socket"
 

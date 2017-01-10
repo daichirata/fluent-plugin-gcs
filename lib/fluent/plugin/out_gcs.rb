@@ -67,10 +67,13 @@ module Fluent
       end
 
       # The customer-supplied, AES-256 encryption key and hash used to encrypt the file.
-      @encryption_opts = {
-        encryption_key: @encryption_key,
-        encryption_key_sha256: @encryption_key_sha256
-      }
+      @encryption_opts = {}
+      if @encryption_key
+        @encryption_opts = {
+          encryption_key: @encryption_key,
+          encryption_key_sha256: @encryption_key_sha256
+        }
+      end
 
       if @object_metadata
         @object_metadata_hash = @object_metadata.map {|m| [m.key, m.value] }.to_h

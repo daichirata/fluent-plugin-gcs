@@ -44,8 +44,6 @@ module Fluent
                  desc: "Permission for the object in GCS"
     config_param :encryption_key, :string, default: nil, secret: true,
                  desc: "Customer-supplied, AES-256 encryption key"
-    config_param :encryption_key_sha256, :string, default: nil, secret: true,
-                 desc: "SHA256 hash of the customer-supplied, AES-256 encryption key"
     config_section :object_metadata, required: false do
       config_param :key, :string, default: ""
       config_param :value, :string, default: ""
@@ -58,18 +56,13 @@ module Fluent
     def configure(conf)
       super
 
-      if @encryption_key && @encryption_key_sha256.nil?
-        raise Fluent::ConfigError, "encryption_key_sha256 parameter must be provided if `encryption_key` is provided."
-      end
-
       if @hex_random_length > MAX_HEX_RANDOM_LENGTH
         raise Fluent::ConfigError, "hex_random_length parameter should be set to #{MAX_HEX_RANDOM_LENGTH} characters or less."
       end
 
-      # The customer-supplied, AES-256 encryption key and hash used to encrypt the file.
+      # The customer-supplied, AES-256 encryption key that will be used to encrypt the file.
       @encryption_opts = {
         encryption_key: @encryption_key,
-        encryption_key_sha256: @encryption_key_sha256
       }
 
       if @object_metadata

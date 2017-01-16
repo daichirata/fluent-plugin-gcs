@@ -41,17 +41,7 @@ class GCSOutputTest < Test::Unit::TestCase
       assert_equal "out_file", driver.instance.instance_variable_get(:@format)
       assert_equal nil, driver.instance.acl
       assert_equal nil, driver.instance.encryption_key
-      assert_equal nil, driver.instance.encryption_key_sha256
       assert_equal [], driver.instance.object_metadata
-    end
-
-    def test_configure_with_encryption_key
-      assert_raise Fluent::ConfigError do
-        create_driver(config(CONFIG, "encryption_key aaaaa"))
-      end
-      assert_nothing_raised do
-        create_driver(config(CONFIG, "encryption_key aaaaa" , "encryption_key_sha256 bbbbbb"))
-      end
     end
 
     def test_configure_with_hex_random_length
@@ -225,7 +215,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -234,7 +223,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
@@ -245,7 +233,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -254,7 +241,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "text/plain",
         content_encoding: "gzip",
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
@@ -265,7 +251,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -274,7 +259,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "text/plain",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.txt", enc_opts, upload_opts)
@@ -285,7 +269,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -294,7 +277,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/json",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.json", enc_opts, upload_opts)
@@ -305,7 +287,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -314,7 +295,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
@@ -323,11 +303,10 @@ class GCSOutputTest < Test::Unit::TestCase
     end
 
     def test_write_with_encryption
-      conf = config(CONFIG, "encryption_key aaa", "encryption_key_sha256 bbb")
+      conf = config(CONFIG, "encryption_key aaa")
 
       enc_opts = {
         encryption_key: "aaa",
-        encryption_key_sha256: "bbb"
       }
 
       upload_opts = {
@@ -336,7 +315,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: "aaa",
-        encryption_key_sha256: "bbb"
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
@@ -347,7 +325,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -356,7 +333,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
@@ -376,7 +352,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -385,7 +360,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
@@ -396,7 +370,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -405,7 +378,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       any_instance_of(Fluent::MemoryBufferChunk) do |b|
@@ -428,7 +400,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       upload_opts = {
@@ -437,7 +408,6 @@ class GCSOutputTest < Test::Unit::TestCase
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
-        encryption_key_sha256: nil
       }.merge(enc_opts)
 
       check_upload(conf) do |bucket|
@@ -452,7 +422,6 @@ class GCSOutputTest < Test::Unit::TestCase
 
       enc_opts = {
         encryption_key: nil,
-        encryption_key_sha256: nil
       }
 
       assert_raise do

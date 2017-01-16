@@ -142,9 +142,11 @@ Permission for the object in GCS. Acceptable values are:
 
 Default is nil (bucket default object ACL). See also [official document](https://cloud.google.com/storage/docs/access-control/lists).
 
-**encryption_key**, **encryption_key_sha256**
+**encryption_key**
 
 You can also choose to provide your own AES-256 key for server-side encryption. See also [Customer-supplied encryption keys](https://cloud.google.com/storage/docs/encryption#customer-supplied).
+
+`encryption_key_sha256` will be calculated using encryption_key.
 
 **overwrite**
 

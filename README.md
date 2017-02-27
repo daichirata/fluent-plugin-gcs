@@ -142,6 +142,19 @@ Permission for the object in GCS. Acceptable values are:
 
 Default is nil (bucket default object ACL). See also [official document](https://cloud.google.com/storage/docs/access-control/lists).
 
+**storage_class**
+
+Storage class of the file. Acceptable values are:
+
+* `dra`            - Durable Reduced Availability
+* `nearline`       - Nearline Storage
+* `coldline`       - Coldline Storage
+* `multi_regional` - Multi-Regional Storage
+* `regional`       - Regional Storage
+* `standard`       - Standard Storage
+
+Default is nil. See also [official document](https://cloud.google.com/storage/docs/storage-classes).
+
 **encryption_key**
 
 You can also choose to provide your own AES-256 key for server-side encryption. See also [Customer-supplied encryption keys](https://cloud.google.com/storage/docs/encryption#customer-supplied).

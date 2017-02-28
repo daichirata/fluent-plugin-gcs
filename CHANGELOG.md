@@ -1,5 +1,10 @@
 ## ChangeLog
 
+### Release 0.3.0 - 2017/02/28
+
+- Add support for setting a File's storage_class on file creation
+  - see also https://cloud.google.com/storage/docs/storage-classes
+
 ### Release 0.2.0 - 2017/01/16
 
 - Remove encryption_key_sha256 parameter.

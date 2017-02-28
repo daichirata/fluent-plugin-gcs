@@ -127,8 +127,6 @@ See also [official Formatter article](http://docs.fluentd.org/articles/formatter
 
 Create GCS bucket if it does not exists. Default is true.
 
-TODO: rate limit
-
 **acl**
 
 Permission for the object in GCS. Acceptable values are:
@@ -141,6 +139,19 @@ Permission for the object in GCS. Acceptable values are:
 * `public_read`     - File owner gets OWNER access, and allUsers get READER access.
 
 Default is nil (bucket default object ACL). See also [official document](https://cloud.google.com/storage/docs/access-control/lists).
+
+**storage_class**
+
+Storage class of the file. Acceptable values are:
+
+* `dra`            - Durable Reduced Availability
+* `nearline`       - Nearline Storage
+* `coldline`       - Coldline Storage
+* `multi_regional` - Multi-Regional Storage
+* `regional`       - Regional Storage
+* `standard`       - Standard Storage
+
+Default is nil. See also [official document](https://cloud.google.com/storage/docs/storage-classes).
 
 **encryption_key**
 

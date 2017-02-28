@@ -28,7 +28,7 @@ module Fluent
                  desc: "Format of GCS object keys"
     config_param :path, :string, default: "",
                  desc: "Path prefix of the files on GCS"
-    config_param :store_as, :enum, list: [:gzip, :json, :text], default: :gzip,
+    config_param :store_as, :enum, list: %i(gzip json text), default: :gzip,
                  desc: "Archive format on GCS"
     config_param :transcoding, :bool, default: false,
                  desc: "Enable the decompressive form of transcoding"
@@ -40,16 +40,16 @@ module Fluent
                  desc: "Overwrite already existing path"
     config_param :format, :string, default: "out_file",
                  desc: "Change one line format in the GCS object"
-    config_param :acl, :enum, list: [:auth_read, :owner_full, :owner_read, :private, :project_private, :public_read], default: nil,
+    config_param :acl, :enum, list: %i(auth_read owner_full owner_read private project_private public_read), default: nil,
                  desc: "Permission for the object in GCS"
+    config_param :storage_class, :enum, list: %i(dra nearline coldline multi_regional regional standard), default: nil,
+                 desc: "Storage class of the file"
     config_param :encryption_key, :string, default: nil, secret: true,
                  desc: "Customer-supplied, AES-256 encryption key"
     config_section :object_metadata, required: false do
       config_param :key, :string, default: ""
       config_param :value, :string, default: ""
     end
-    # TODO: gem "google-cloud-storage" does not support object lavel storage_class yet.
-    # config_param :storage_class, :string, default: "regional"
 
     MAX_HEX_RANDOM_LENGTH = 32
 
@@ -99,6 +99,7 @@ module Fluent
         opts = {
           metadata: @object_metadata_hash,
           acl: @acl,
+          storage_class: @storage_class,
           content_type: @object_creator.content_type,
           content_encoding: @object_creator.content_encoding,
         }

@@ -40,6 +40,7 @@ class GCSOutputTest < Test::Unit::TestCase
       assert_equal false, driver.instance.overwrite
       assert_equal "out_file", driver.instance.instance_variable_get(:@format)
       assert_equal nil, driver.instance.acl
+      assert_equal nil, driver.instance.storage_class
       assert_equal nil, driver.instance.encryption_key
       assert_equal [], driver.instance.object_metadata
     end
@@ -220,6 +221,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
@@ -238,6 +240,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "text/plain",
         content_encoding: "gzip",
         encryption_key: nil,
@@ -256,6 +259,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "text/plain",
         content_encoding: nil,
         encryption_key: nil,
@@ -274,6 +278,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "application/json",
         content_encoding: nil,
         encryption_key: nil,
@@ -292,6 +297,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
@@ -312,6 +318,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: "aaa",
@@ -330,6 +337,26 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: :auth_read,
+        storage_class: nil,
+        content_type: "application/gzip",
+        content_encoding: nil,
+        encryption_key: nil,
+      }.merge(enc_opts)
+
+      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+    end
+
+    def test_write_with_storage_class
+      conf = config(CONFIG, "storage_class regional")
+
+      enc_opts = {
+        encryption_key: nil,
+      }
+
+      upload_opts = {
+        metadata: {},
+        acl: nil,
+        storage_class: :regional,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
@@ -357,6 +384,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {"test-key-1" => "test-value-1", "test-key-2" => "test-value-2"},
         acl: nil,
+        storage_class: nil,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
@@ -375,6 +403,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,
@@ -405,6 +434,7 @@ class GCSOutputTest < Test::Unit::TestCase
       upload_opts = {
         metadata: {},
         acl: nil,
+        storage_class: nil,
         content_type: "application/gzip",
         content_encoding: nil,
         encryption_key: nil,

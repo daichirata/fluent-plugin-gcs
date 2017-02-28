@@ -127,8 +127,6 @@ See also [official Formatter article](http://docs.fluentd.org/articles/formatter
 
 Create GCS bucket if it does not exists. Default is true.
 
-TODO: rate limit
-
 **acl**
 
 Permission for the object in GCS. Acceptable values are:

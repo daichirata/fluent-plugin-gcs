@@ -149,8 +149,6 @@ module Fluent::Plugin
     end
 
     def format_path(time_slice_format, time_slice)
-      time_slice_format = @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey'])
-
       now = Time.strptime(time_slice, time_slice_format)
       (@localtime ? now : now.utc).strftime(@path)
     end

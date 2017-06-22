@@ -4,10 +4,13 @@ require "socket"
 
 require "fluent/plugin/gcs/object_creator"
 require "fluent/plugin/gcs/version"
+require "fluent/plugin/output"
 
-module Fluent
-  class GCSOutput < TimeSlicedOutput
+module Fluent::Plugin
+  class GCSOutput < Output
     Fluent::Plugin.register_output("gcs", self)
+
+    helpers :compat_parameters, :formatter, :inject
 
     def initialize
       super
@@ -51,9 +54,21 @@ module Fluent
       config_param :value, :string, default: ""
     end
 
+    DEFAULT_FORMAT_TYPE = "out_file"
+
+    config_section :format do
+      config_set_default :@type, DEFAULT_FORMAT_TYPE
+    end
+
+    config_section :buffer do
+      config_set_default :chunk_keys, ['time']
+      config_set_default :timekey, (60 * 60 * 24)
+    end
+
     MAX_HEX_RANDOM_LENGTH = 32
 
     def configure(conf)
+      compat_parameters_convert(conf, :buffer, :formatter, :inject)
       super
 
       if @hex_random_length > MAX_HEX_RANDOM_LENGTH
@@ -69,10 +84,13 @@ module Fluent
         @object_metadata_hash = @object_metadata.map {|m| [m.key, m.value] }.to_h
       end
 
-      @formatter = Fluent::Plugin.new_formatter(@format)
-      @formatter.configure(conf)
+      @formatter = formatter_create
 
       @object_creator = Fluent::GCS.discovered_object_creator(@store_as, transcoding: @transcoding)
+      # For backward compatibility
+      # TODO: Remove time_slice_format when end of support compat_parameters
+      @configured_time_slice_format = conf['time_slice_format']
+      @time_slice_with_tz = Fluent::Timezone.formatter(@timekey_zone, @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey']))
     end
 
     def start
@@ -89,7 +107,12 @@ module Fluent
     end
 
     def format(tag, time, record)
-      @formatter.format(tag, time, record)
+      r = inject_values_to_record(tag, time, record)
+      @formatter.format(tag, time, r)
+    end
+
+    def multi_workers_ready?
+      true
     end
 
     def write(chunk)
@@ -126,22 +149,24 @@ module Fluent
       Digest::MD5.hexdigest(chunk.unique_id)[0...@hex_random_length]
     end
 
-    def format_path(chunk)
-      now = Time.strptime(chunk.key, @time_slice_format)
-      (@localtime ? now : now.utc).strftime(@path)
-    end
-
     def generate_path(chunk, i = 0, prev = nil)
+      metadata = chunk.metadata
+      time_slice = if metadata.timekey.nil?
+                     ''.freeze
+                   else
+                     @time_slice_with_tz.call(metadata.timekey)
+                   end
       tags = {
         "%{file_extension}" => @object_creator.file_extension,
         "%{hex_random}" => hex_random(chunk),
         "%{hostname}" => Socket.gethostname,
         "%{index}" => i,
-        "%{path}" => format_path(chunk),
-        "%{time_slice}" => chunk.key,
+        "%{path}" => @path,
+        "%{time_slice}" => time_slice,
         "%{uuid_flush}" => SecureRandom.uuid,
       }
       path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
+      path = extract_placeholders(path, metadata)
       return path unless @gcs_bucket.find_file(path, @encryption_opts)
 
       if path == prev
@@ -152,6 +177,17 @@ module Fluent
         raise "object `#{path}` already exists"
       end
       generate_path(chunk, i + 1, path)
+    end
+
+    # This is stolen from Fluentd
+    def timekey_to_timeformat(timekey)
+      case timekey
+      when nil          then ''
+      when 0...60       then '%Y%m%d%H%M%S' # 60 exclusive
+      when 60...3600    then '%Y%m%d%H%M'
+      when 3600...86400 then '%Y%m%d%H'
+      else                   '%Y%m%d'
+      end
     end
   end
 end

@@ -1,7 +1,11 @@
 require "helper"
+require "fluent/test/driver/output"
+require "fluent/test/helpers"
 require "google/cloud/storage"
 
 class GCSOutputTest < Test::Unit::TestCase
+  include Fluent::Test::Helpers
+
   def setup
     Fluent::Test.setup
   end
@@ -16,7 +20,7 @@ class GCSOutputTest < Test::Unit::TestCase
   EOC
 
   def create_driver(conf = CONFIG)
-    Fluent::Test::TimeSlicedOutputTestDriver.new(Fluent::GCSOutput) do
+    Fluent::Test::Driver::Output.new(Fluent::Plugin::GCSOutput) do
       attr_accessor :object_creator, :encryption_opts
     end.configure(conf)
   end
@@ -126,70 +130,79 @@ class GCSOutputTest < Test::Unit::TestCase
       storage.bucket { bucket }
       stub(Google::Cloud::Storage).new { storage }
 
-      @time = Time.parse("2016-01-01 12:00:00 UTC").to_i
+      @time = event_time("2016-01-01 12:00:00 UTC")
     end
 
     def test_format
       driver = create_driver
-      driver.emit({"a"=>1}, @time)
-      driver.emit({"a"=>2}, @time)
-      driver.expect_format %[2016-01-01T12:00:00Z\ttest\t{"a":1}\n]
-      driver.expect_format %[2016-01-01T12:00:00Z\ttest\t{"a":2}\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1})
+        driver.feed(@time, {"a"=>2})
+      end
+      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":1}\n], driver.formatted[0]
+      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":2}\n], driver.formatted[1]
     end
 
     def test_format_included_tag_and_time
       driver = create_driver(config(CONFIG, 'include_tag_key true', 'include_time_key true'))
-      driver.emit({"a"=>1}, @time)
-      driver.emit({"a"=>2}, @time)
-      driver.expect_format %[2016-01-01T12:00:00Z\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n]
-      driver.expect_format %[2016-01-01T12:00:00Z\ttest\t{"a":2,"tag":"test","time":"2016-01-01T12:00:00Z"}\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1})
+        driver.feed(@time, {"a"=>2})
+      end
+      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n],
+                   driver.formatted[0]
+      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":2,"tag":"test","time":"2016-01-01T12:00:00Z"}\n],
+                   driver.formatted[1]
     end
 
     def test_format_with_format_ltsv
       driver = create_driver(config(CONFIG, 'format ltsv'))
-      driver.emit({"a"=>1, "b"=>1}, @time)
-      driver.emit({"a"=>2, "b"=>2}, @time)
-      driver.expect_format %[a:1\tb:1\n]
-      driver.expect_format %[a:2\tb:2\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1, "b"=>1})
+        driver.feed(@time, {"a"=>2, "b"=>2})
+      end
+      assert_equal %[a:1\tb:1\n], driver.formatted[0]
+      assert_equal %[a:2\tb:2\n], driver.formatted[1]
     end
 
     def test_format_with_format_json
       driver = create_driver(config(CONFIG, 'format json'))
-      driver.emit({"a"=>1}, @time)
-      driver.emit({"a"=>2}, @time)
-      driver.expect_format %[{"a":1}\n]
-      driver.expect_format %[{"a":2}\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1})
+        driver.feed(@time, {"a"=>2})
+      end
+      assert_equal %[{"a":1}\n], driver.formatted[0]
+      assert_equal %[{"a":2}\n], driver.formatted[1]
     end
 
     def test_format_with_format_json_included_tag
       driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true'))
-      driver.emit({"a"=>1}, @time)
-      driver.emit({"a"=>2}, @time)
-      driver.expect_format %[{"a":1,"tag":"test"}\n]
-      driver.expect_format %[{"a":2,"tag":"test"}\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1})
+        driver.feed(@time, {"a"=>2})
+      end
+      assert_equal %[{"a":1,"tag":"test"}\n], driver.formatted[0]
+      assert_equal %[{"a":2,"tag":"test"}\n], driver.formatted[1]
     end
 
     def test_format_with_format_json_included_time
       driver = create_driver(config(CONFIG, 'format json', 'include_time_key true'))
-      driver.emit({"a"=>1}, @time)
-      driver.emit({"a"=>2}, @time)
-      driver.expect_format %[{"a":1,"time":"2016-01-01T12:00:00Z"}\n]
-      driver.expect_format %[{"a":2,"time":"2016-01-01T12:00:00Z"}\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1})
+        driver.feed(@time, {"a"=>2})
+      end
+      assert_equal %[{"a":1,"time":"2016-01-01T12:00:00Z"}\n], driver.formatted[0]
+      assert_equal %[{"a":2,"time":"2016-01-01T12:00:00Z"}\n], driver.formatted[1]
     end
 
     def test_format_with_format_json_included_tag_and_time
       driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true', 'include_time_key true'))
-      driver.emit({"a"=>1}, @time)
-      driver.emit({"a"=>2}, @time)
-      driver.expect_format %[{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n]
-      driver.expect_format %[{"a":2,"tag":"test","time":"2016-01-01T12:00:00Z"}\n]
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(@time, {"a"=>1})
+        driver.feed(@time, {"a"=>2})
+      end
+      assert_equal %[{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n], driver.formatted[0]
+      assert_equal %[{"a":2,"tag":"test","time":"2016-01-01T12:00:00Z"}\n], driver.formatted[1]
     end
   end
 
@@ -207,8 +220,9 @@ class GCSOutputTest < Test::Unit::TestCase
       stub(Google::Cloud::Storage).new { storage }
 
       driver = create_driver(conf)
-      driver.emit({"a"=>1}, Time.parse("2016-01-01 15:00:00 UTC").to_i)
-      driver.run
+      driver.run(default_tag: "test") do
+        driver.feed(event_time("2016-01-01 15:00:00 UTC"), {"a"=>1})
+      end
     end
 
     def test_write_with_gzip
@@ -305,6 +319,38 @@ class GCSOutputTest < Test::Unit::TestCase
 
       Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
         check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      end
+    end
+
+    def test_write_with_placeholder_in_path
+      conf = config_element('ROOT', '', {
+                              "project" => "test_project",
+                              "keyfile" => "test_keyfile",
+                              "bucket"  => "test_bucket",
+                              "path"    => "log/${tag}/",
+                              "utc"     => ""}, [
+                              config_element('buffer', 'tag, time',
+                                             {'@type'        => "memory",
+                                              'timekey'      => 86400,
+                                              'timekey_wait' => '10m',
+                                             })
+                            ])
+
+      enc_opts = {
+        encryption_key: nil,
+      }
+
+      upload_opts = {
+        metadata: {},
+        acl: nil,
+        storage_class: nil,
+        content_type: "application/gzip",
+        content_encoding: nil,
+        encryption_key: nil,
+      }.merge(enc_opts)
+
+      Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
+        check_upload(conf, "log/test/20160101_0.gz", enc_opts, upload_opts)
       end
     end
 
@@ -409,7 +455,7 @@ class GCSOutputTest < Test::Unit::TestCase
         encryption_key: nil,
       }.merge(enc_opts)
 
-      any_instance_of(Fluent::MemoryBufferChunk) do |b|
+      any_instance_of(Fluent::Plugin::Buffer::MemoryChunk) do |b|
         # Memo: Digest::MD5.hexdigest("unique_id") => "69080cee5b6d4c35a8bbf5c48335fe08"
         stub(b).unique_id { "unique_id" }
       end

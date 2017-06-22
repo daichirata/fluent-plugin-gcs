@@ -149,11 +149,6 @@ module Fluent::Plugin
       Digest::MD5.hexdigest(chunk.unique_id)[0...@hex_random_length]
     end
 
-    def format_path(time_slice_format, time_slice)
-      now = Time.strptime(time_slice, time_slice_format)
-      (@buffer_config.timekey_use_utc ? now.utc : now).strftime(@path)
-    end
-
     def generate_path(chunk, i = 0, prev = nil)
       metadata = chunk.metadata
       time_slice_format = @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey'])
@@ -168,7 +163,7 @@ module Fluent::Plugin
         "%{hex_random}" => hex_random(chunk),
         "%{hostname}" => Socket.gethostname,
         "%{index}" => i,
-        "%{path}" => format_path(time_slice_format, time_slice),
+        "%{path}" => @path,
         "%{time_slice}" => time_slice,
         "%{uuid_flush}" => SecureRandom.uuid,
       }

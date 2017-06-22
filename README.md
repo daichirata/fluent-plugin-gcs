@@ -23,7 +23,7 @@ gem install fluent-plugin-gcs
   object_key_format %{path}%{time_slice}_%{index}.%{file_extension}
   path logs/${tag}/%Y/%m/%d/
 
-  # if you want to use ${tag} or %Y/%m/%d/ like syntax in path / s3_object_key_format,
+  # if you want to use ${tag} or %Y/%m/%d/ like syntax in path / object_key_format,
   # need to specify tag for ${tag} and time for %Y/%m/%d in <buffer> argument.
   <buffer tag,time>
     @type file

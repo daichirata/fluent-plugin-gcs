@@ -11,6 +11,35 @@ gem install fluent-plugin-gcs
 
 ## Examples
 
+### For v0.14 style
+
+```
+<match pattern>
+  @type gcs
+
+  project YOUR_PROJECT
+  keyfile YOUR_KEYFILE_PATH
+  bucket YOUR_GCS_BUCKET_NAME
+  object_key_format %{path}%{time_slice}_%{index}.%{file_extension}
+  path logs/${tag}/%Y/%m/%d/
+
+  # if you want to use ${tag} or %Y/%m/%d/ like syntax in path / s3_object_key_format,
+  # need to specify tag for ${tag} and time for %Y/%m/%d in <buffer> argument.
+  <buffer tag,time>
+    @type file
+    path /var/log/fluent/gcs
+    timekey 3600 # 1 hour partition
+    timekey_wait 10m
+    timekey_use_utc true # use utc
+  </buffer>
+  <format>
+    @type json
+  </format>
+</match>
+```
+
+### For v0.12 style
+
 ```
 <match pattern>
   @type gcs

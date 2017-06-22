@@ -151,8 +151,6 @@ module Fluent::Plugin
 
     def generate_path(chunk, i = 0, prev = nil)
       metadata = chunk.metadata
-      time_slice_format = @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey'])
-
       time_slice = if metadata.timekey.nil?
                      ''.freeze
                    else

@@ -90,6 +90,7 @@ module Fluent::Plugin
       # For backward compatibility
       # TODO: Remove time_slice_format when end of support compat_parameters
       @configured_time_slice_format = conf['time_slice_format']
+      @time_slice_with_tz = Fluent::Timezone.formatter(@timekey_zone, @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey']))
     end
 
     def start
@@ -160,7 +161,7 @@ module Fluent::Plugin
       time_slice = if metadata.timekey.nil?
                      ''.freeze
                    else
-                     Time.at(metadata.timekey).utc.strftime(time_slice_format)
+                     @time_slice_with_tz.call(metadata.timekey)
                    end
       tags = {
         "%{file_extension}" => @object_creator.file_extension,

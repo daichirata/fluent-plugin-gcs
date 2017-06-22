@@ -322,6 +322,38 @@ class GCSOutputTest < Test::Unit::TestCase
       end
     end
 
+    def test_write_with_placeholder_in_path
+      conf = config_element('ROOT', '', {
+                              "project" => "test_project",
+                              "keyfile" => "test_keyfile",
+                              "bucket"  => "test_bucket",
+                              "path"    => "log/${tag}/",
+                              "utc"     => ""}, [
+                              config_element('buffer', 'tag, time',
+                                             {'@type'        => "memory",
+                                              'timekey'      => 86400,
+                                              'timekey_wait' => '10m',
+                                             })
+                            ])
+
+      enc_opts = {
+        encryption_key: nil,
+      }
+
+      upload_opts = {
+        metadata: {},
+        acl: nil,
+        storage_class: nil,
+        content_type: "application/gzip",
+        content_encoding: nil,
+        encryption_key: nil,
+      }.merge(enc_opts)
+
+      Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
+        check_upload(conf, "log/test/20160101_0.gz", enc_opts, upload_opts)
+      end
+    end
+
     def test_write_with_encryption
       conf = config(CONFIG, "encryption_key aaa")
 

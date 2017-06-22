@@ -150,7 +150,7 @@ module Fluent::Plugin
 
     def format_path(time_slice_format, time_slice)
       now = Time.strptime(time_slice, time_slice_format)
-      (@localtime ? now : now.utc).strftime(@path)
+      (@buffer_config.timekey_use_utc ? now.utc : now).strftime(@path)
     end
 
     def generate_path(chunk, i = 0, prev = nil)

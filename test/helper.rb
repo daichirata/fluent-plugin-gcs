@@ -21,3 +21,11 @@ require "test/unit/rr"
 
 class Test::Unit::TestCase
 end
+
+def silenced
+  $stdout = StringIO.new
+
+  yield
+ensure
+  $stdout = STDOUT
+end

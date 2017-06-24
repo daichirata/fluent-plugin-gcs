@@ -501,9 +501,11 @@ class GCSOutputTest < Test::Unit::TestCase
       }
 
       assert_raise do
-        check_upload(conf) do |bucket|
-          bucket.find_file(anything, enc_opts) { true }
-          bucket.find_file(anything, enc_opts) { true }
+        silenced do
+          check_upload(conf) do |bucket|
+            bucket.find_file(anything, enc_opts) { true }
+            bucket.find_file(anything, enc_opts) { true }
+          end
         end
       end
     end

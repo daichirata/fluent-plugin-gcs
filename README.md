@@ -3,10 +3,20 @@
 
 Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluentd).
 
+## Requirements
+
+| fluent-plugin-gcs  | fluentd    | ruby   |
+|--------------------|------------|--------|
+| >= 0.4.0           | >= v0.14.0 | >= 2.1 |
+|  < 0.4.0           | >= v0.12.0 | >= 1.9 |
+
+NOTE: fluent-plugin-gcs v0.4.0 is now beta.
+
 ## Installation
 
 ``` shell
-gem install fluent-plugin-gcs
+$ gem install fluent-plugin-gcs -v "~> 0.3"  --no-document # for fluentd v0.12 or later
+$ gem install fluent-plugin-gcs -v "0.4.0.beta" --no-document # for fluentd v0.14 or later
 ```
 
 ## Examples
@@ -28,10 +38,11 @@ gem install fluent-plugin-gcs
   <buffer tag,time>
     @type file
     path /var/log/fluent/gcs
-    timekey 3600 # 1 hour partition
+    timekey 1h # 1 hour partition
     timekey_wait 10m
     timekey_use_utc true # use utc
   </buffer>
+
   <format>
     @type json
   </format>

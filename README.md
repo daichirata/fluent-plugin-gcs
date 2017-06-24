@@ -38,10 +38,11 @@ $ gem install fluent-plugin-gcs -v "0.4.0.beta" --no-document # for fluentd v0.1
   <buffer tag,time>
     @type file
     path /var/log/fluent/gcs
-    timekey 3600 # 1 hour partition
+    timekey 1h # 1 hour partition
     timekey_wait 10m
     timekey_use_utc true # use utc
   </buffer>
+
   <format>
     @type json
   </format>

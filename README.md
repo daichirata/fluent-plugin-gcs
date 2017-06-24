@@ -16,7 +16,7 @@ NOTE: fluent-plugin-gcs v0.4.0 is now beta.
 
 ``` shell
 $ gem install fluent-plugin-gcs -v "~> 0.3"  --no-document # for fluentd v0.12 or later
-$ gem install fluent-plugin-gcs -v "0.4.0.beta" --no-document # for fluentd v0.14 or later
+$ gem install fluent-plugin-gcs -v "0.4.0.beta1" --no-document # for fluentd v0.14 or later
 ```
 
 ## Examples

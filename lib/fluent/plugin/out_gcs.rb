@@ -166,7 +166,7 @@ module Fluent::Plugin
         "%{uuid_flush}" => SecureRandom.uuid,
       }
       path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
-      path = extract_placeholders(path, metadata)
+      path = extract_placeholders(path, chunk)
       return path unless @gcs_bucket.find_file(path, @encryption_opts)
 
       if path == prev

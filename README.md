@@ -225,7 +225,6 @@ Use Local time instead of UTC.
 
 Use UTC instead of local time.
 
-
 And see [official Time Sliced Output article](http://docs.fluentd.org/articles/output-plugin-overview#time-sliced-output-parameters)
 
 ### ObjectMetadata

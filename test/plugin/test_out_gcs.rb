@@ -15,8 +15,10 @@ class GCSOutputTest < Test::Unit::TestCase
     keyfile test_keyfile
     bucket test_bucket
     path log/
-    buffer_type memory
-    utc
+    <buffer>
+      @type memory
+      timekey_use_utc true
+    </buffer>
   EOC
 
   def create_driver(conf = CONFIG)
@@ -59,20 +61,17 @@ class GCSOutputTest < Test::Unit::TestCase
     end
 
     def test_configure_with_gzip_object_creator
-      conf = config(CONFIG, "store_as gzip")
-      driver = create_driver(conf)
+      driver = create_driver(config(CONFIG, "store_as gzip"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::GZipObjectCreator)
     end
 
     def test_configure_with_text_object_creator
-      conf = config(CONFIG, "store_as text")
-      driver = create_driver(conf)
+      driver = create_driver(config(CONFIG, "store_as text"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::TextObjectCreator)
     end
 
     def test_configure_with_json_object_creator
-      conf = config(CONFIG, "store_as json")
-      driver = create_driver(conf)
+      driver = create_driver(config(CONFIG, "store_as json"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::JSONObjectCreator)
     end
   end
@@ -84,7 +83,8 @@ class GCSOutputTest < Test::Unit::TestCase
       project: "test_project",
       keyfile: "test_keyfile",
       retries: 1,
-      timeout: 2) { bucket }
+      timeout: 2,
+    ) { bucket }
 
     driver = create_driver <<-EOC
       project test_project
@@ -92,7 +92,10 @@ class GCSOutputTest < Test::Unit::TestCase
       bucket test_bucket
       client_retries 1
       client_timeout 2
-      buffer_type memory
+      <buffer>
+        @type memory
+        timekey_use_utc true
+      </buffer>
     EOC
 
     driver.instance.start
@@ -106,15 +109,21 @@ class GCSOutputTest < Test::Unit::TestCase
 
     driver = create_driver <<-EOC
       bucket test_bucket
-      buffer_type memory
+      <buffer>
+        @type memory
+        timekey_use_utc true
+      </buffer>
     EOC
     driver.instance.start
     assert_equal "ok", driver.instance.instance_variable_get(:@gcs_bucket)
 
     driver2 = create_driver <<-EOC
       bucket test_bucket
-      buffer_type memory
       auto_create_bucket false
+      <buffer>
+        @type memory
+        timekey_use_utc true
+      </buffer>
     EOC
     assert_raise do
       driver2.instance.start
@@ -134,75 +143,89 @@ class GCSOutputTest < Test::Unit::TestCase
     end
 
     def test_format
-      driver = create_driver
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1})
-        driver.feed(@time, {"a"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(CONFIG)
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1})
+          driver.feed(@time, {"a"=>2})
+        end
+        assert_equal %[2016-01-01T12:00:00+00:00\ttest\t{"a":1}\n], driver.formatted[0]
+        assert_equal %[2016-01-01T12:00:00+00:00\ttest\t{"a":2}\n], driver.formatted[1]
       end
-      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":1}\n], driver.formatted[0]
-      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":2}\n], driver.formatted[1]
     end
 
     def test_format_included_tag_and_time
-      driver = create_driver(config(CONFIG, 'include_tag_key true', 'include_time_key true'))
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1})
-        driver.feed(@time, {"a"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(config(CONFIG, 'include_tag_key true', 'include_time_key true'))
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1})
+          driver.feed(@time, {"a"=>2})
+        end
+        assert_equal %[2016-01-01T12:00:00+00:00\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00+00:00"}\n],
+                     driver.formatted[0]
+        assert_equal %[2016-01-01T12:00:00+00:00\ttest\t{"a":2,"tag":"test","time":"2016-01-01T12:00:00+00:00"}\n],
+                     driver.formatted[1]
       end
-      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n],
-                   driver.formatted[0]
-      assert_equal %[2016-01-01T12:00:00Z\ttest\t{"a":2,"tag":"test","time":"2016-01-01T12:00:00Z"}\n],
-                   driver.formatted[1]
     end
 
     def test_format_with_format_ltsv
-      driver = create_driver(config(CONFIG, 'format ltsv'))
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1, "b"=>1})
-        driver.feed(@time, {"a"=>2, "b"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(config(CONFIG, 'format ltsv'))
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1, "b"=>1})
+          driver.feed(@time, {"a"=>2, "b"=>2})
+        end
+        assert_equal %[a:1\tb:1\n], driver.formatted[0]
+        assert_equal %[a:2\tb:2\n], driver.formatted[1]
       end
-      assert_equal %[a:1\tb:1\n], driver.formatted[0]
-      assert_equal %[a:2\tb:2\n], driver.formatted[1]
     end
 
     def test_format_with_format_json
-      driver = create_driver(config(CONFIG, 'format json'))
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1})
-        driver.feed(@time, {"a"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(config(CONFIG, 'format json'))
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1})
+          driver.feed(@time, {"a"=>2})
+        end
+        assert_equal %[{"a":1}\n], driver.formatted[0]
+        assert_equal %[{"a":2}\n], driver.formatted[1]
       end
-      assert_equal %[{"a":1}\n], driver.formatted[0]
-      assert_equal %[{"a":2}\n], driver.formatted[1]
     end
 
     def test_format_with_format_json_included_tag
-      driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true'))
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1})
-        driver.feed(@time, {"a"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true'))
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1})
+          driver.feed(@time, {"a"=>2})
+        end
+        assert_equal %[{"a":1,"tag":"test"}\n], driver.formatted[0]
+        assert_equal %[{"a":2,"tag":"test"}\n], driver.formatted[1]
       end
-      assert_equal %[{"a":1,"tag":"test"}\n], driver.formatted[0]
-      assert_equal %[{"a":2,"tag":"test"}\n], driver.formatted[1]
     end
 
     def test_format_with_format_json_included_time
-      driver = create_driver(config(CONFIG, 'format json', 'include_time_key true'))
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1})
-        driver.feed(@time, {"a"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(config(CONFIG, 'format json', 'include_time_key true'))
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1})
+          driver.feed(@time, {"a"=>2})
+        end
+        assert_equal %[{"a":1,"time":"2016-01-01T12:00:00+00:00"}\n], driver.formatted[0]
+        assert_equal %[{"a":2,"time":"2016-01-01T12:00:00+00:00"}\n], driver.formatted[1]
       end
-      assert_equal %[{"a":1,"time":"2016-01-01T12:00:00Z"}\n], driver.formatted[0]
-      assert_equal %[{"a":2,"time":"2016-01-01T12:00:00Z"}\n], driver.formatted[1]
     end
 
     def test_format_with_format_json_included_tag_and_time
-      driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true', 'include_time_key true'))
-      driver.run(default_tag: "test") do
-        driver.feed(@time, {"a"=>1})
-        driver.feed(@time, {"a"=>2})
+      with_timezone("UTC") do
+        driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true', 'include_time_key true'))
+        driver.run(default_tag: "test") do
+          driver.feed(@time, {"a"=>1})
+          driver.feed(@time, {"a"=>2})
+        end
+        assert_equal %[{"a":1,"tag":"test","time":"2016-01-01T12:00:00+00:00"}\n], driver.formatted[0]
+        assert_equal %[{"a":2,"tag":"test","time":"2016-01-01T12:00:00+00:00"}\n], driver.formatted[1]
       end
-      assert_equal %[{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n], driver.formatted[0]
-      assert_equal %[{"a":2,"tag":"test","time":"2016-01-01T12:00:00Z"}\n], driver.formatted[1]
     end
   end
 
@@ -323,18 +346,18 @@ class GCSOutputTest < Test::Unit::TestCase
     end
 
     def test_write_with_placeholder_in_path
-      conf = config_element('ROOT', '', {
-                              "project" => "test_project",
-                              "keyfile" => "test_keyfile",
-                              "bucket"  => "test_bucket",
-                              "path"    => "log/${tag}/",
-                              "utc"     => ""}, [
-                              config_element('buffer', 'tag, time',
-                                             {'@type'        => "memory",
-                                              'timekey'      => 86400,
-                                              'timekey_wait' => '10m',
-                                             })
-                            ])
+      conf = <<-CONFIG
+        project test_project
+        keyfile test_keyfile
+        bucket test_bucket
+        path log/${tag}/
+        <buffer tag,time>
+          @type memory
+          timekey 86400
+          timekey_wait 10m
+          timekey_use_utc true
+        </buffer>
+      CONFIG
 
       enc_opts = {
         encryption_key: nil,

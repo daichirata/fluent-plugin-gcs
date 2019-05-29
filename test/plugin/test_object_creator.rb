@@ -1,5 +1,6 @@
 require "helper"
 require "zlib"
+require "lzo"
 
 class GCSObjectCreatorTest < Test::Unit::TestCase
   DUMMY_DATA = %[2016-01-01T12:00:00Z\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n] +
@@ -100,4 +101,41 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
       end
     end
   end
+
+  sub_test_case "LzoObjectCreator" do
+    def test_content_type_and_content_encoding
+      c = Fluent::GCS::LzoObjectCreator.new(true)
+      assert_equal "text/plain", c.content_type
+      assert_equal "lzop", c.content_encoding
+
+      c = Fluent::GCS::LzoObjectCreator.new(false)
+      assert_equal "application/x-lzo", c.content_type
+      assert_equal nil, c.content_encoding
+    end
+
+    def test_file_extension
+      c = Fluent::GCS::LzoObjectCreator.new(true)
+      assert_equal "lzo", c.file_extension
+    end
+
+    def test_write
+
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::LzoObjectCreator.new(true)
+
+        c.write(DummyChunk.new, f)
+
+         File.open(f.path, 'rb') do |tmp|
+           lzo_decoded = LZO.decompress(tmp)
+           assert_equal DUMMY_DATA, lzo_decoded
+         end
+
+      end
+
+    end
+  end
+
 end

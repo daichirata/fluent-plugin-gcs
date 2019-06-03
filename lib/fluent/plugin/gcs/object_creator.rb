@@ -14,7 +14,7 @@ module Fluent
       when :text
         Fluent::GCS::TextObjectCreator.new
       when :lzo
-        Fluent::GCS::LzoObjectCreator.new
+        Fluent::GCS::LzoObjectCreator.new(transcoding)
       end
     end
 

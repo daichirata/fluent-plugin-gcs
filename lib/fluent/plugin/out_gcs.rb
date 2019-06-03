@@ -28,7 +28,7 @@ module Fluent
                  desc: "Format of GCS object keys"
     config_param :path, :string, default: "",
                  desc: "Path prefix of the files on GCS"
-    config_param :store_as, :enum, list: %i(gzip json text), default: :gzip,
+    config_param :store_as, :enum, list: %i(gzip json text lzo), default: :gzip,
                  desc: "Archive format on GCS"
     config_param :transcoding, :bool, default: false,
                  desc: "Enable the decompressive form of transcoding"

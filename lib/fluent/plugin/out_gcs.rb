@@ -49,6 +49,8 @@ module Fluent::Plugin
                  desc: "Storage class of the file"
     config_param :encryption_key, :string, default: nil, secret: true,
                  desc: "Customer-supplied, AES-256 encryption key"
+    config_param :blind_write, :bool, default: false,
+                 desc: "Whether to check if object already exists by given GCS path. Allows avoiding giving storage.object.get permission"
     config_section :object_metadata, required: false do
       config_param :key, :string, default: ""
       config_param :value, :string, default: ""
@@ -149,6 +151,15 @@ module Fluent::Plugin
       Digest::MD5.hexdigest(chunk.unique_id)[0...@hex_random_length]
     end
 
+    def check_object_exists(path)
+      if !@blind_write
+        log.info "checking `#{path}`"
+        return @gcs_bucket.find_file(path, @encryption_opts)
+      else
+        return false
+      end
+    end
+
     def generate_path(chunk, i = 0, prev = nil)
       metadata = chunk.metadata
       time_slice = if metadata.timekey.nil?
@@ -167,7 +178,7 @@ module Fluent::Plugin
       }
       path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
       path = extract_placeholders(path, chunk)
-      return path unless @gcs_bucket.find_file(path, @encryption_opts)
+      return path unless check_object_exists(path)
 
       if path == prev
         if @overwrite

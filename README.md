@@ -227,6 +227,16 @@ Use UTC instead of local time.
 
 And see [official Time Sliced Output article](http://docs.fluentd.org/articles/output-plugin-overview#time-sliced-output-parameters)
 
+**blind_write**
+
+Doesn't check if an object exists in GCS before writing. Default is false.
+
+Allows to avoid granting of `storage.objects.get` permission.
+
+Warning! If the obkect exists and `storage.objects.delete` permission is not
+granted, there will be an unrecoverable error. Usage of `%{hex_random}` is
+recommended.
+
 ### ObjectMetadata
 
 User provided web-safe keys and arbitrary string values that will returned with requests for the file as "x-goog-meta-" response headers.

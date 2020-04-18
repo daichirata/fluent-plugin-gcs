@@ -153,7 +153,6 @@ module Fluent::Plugin
 
     def check_object_exists(path)
       if !@blind_write
-        log.info "checking `#{path}`"
         return @gcs_bucket.find_file(path, @encryption_opts)
       else
         return false

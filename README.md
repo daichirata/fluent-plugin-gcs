@@ -65,11 +65,12 @@ GCS bucket name.
 
 **store_as**
 
-Archive format on GCS. You can use serveral format:
+Archive format on GCS. You can use several formats:
 
 * gzip (default)
 * json
 * text
+* lzo
 
 **path**
 

@@ -1,5 +1,7 @@
 require "tempfile"
 require "zlib"
+require "lzo"
+
 
 module Fluent
   module GCS
@@ -11,6 +13,8 @@ module Fluent
         Fluent::GCS::JSONObjectCreator.new
       when :text
         Fluent::GCS::TextObjectCreator.new
+      when :lzo
+        Fluent::GCS::LzoObjectCreator.new(transcoding)
       end
     end
 
@@ -62,6 +66,30 @@ module Fluent
         writer = Zlib::GzipWriter.new(io)
         chunk.write_to(writer)
         writer.finish
+      end
+    end
+
+    class LzoObjectCreator < ObjectCreator
+      def initialize(transcoding)
+        @transcoding = transcoding
+      end
+
+      def content_type
+        @transcoding ? "text/plain" : "application/x-lzo"
+      end
+
+      def content_encoding
+        @transcoding ? "lzop" : nil
+      end
+
+      def file_extension
+        "lzo"
+      end
+
+      def write(chunk, io)
+        writer = LZO::LzopCompressor.new io, name: '', mode: 0100644, mtime: Time.now
+        chunk.write_to(writer)
+        writer.close # need to close, as LzopCompressor writes LZO end symbols
       end
     end
 

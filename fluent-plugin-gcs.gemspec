@@ -6,8 +6,8 @@ require 'fluent/plugin/gcs/version'
 Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-gcs"
   spec.version       = Fluent::GCSPlugin::VERSION
-  spec.authors       = ["Daichi HIRATA"]
-  spec.email         = ["hirata.daichi@gmail.com"]
+  spec.authors       = ["Daichi HIRATA", "Bohdan Snisar"]
+  spec.email         = ["hirata.daichi@gmail.com", "bogdan.sns@gmail.com"]
   spec.summary       = "Google Cloud Storage output plugin for Fluentd"
   spec.description   = "Google Cloud Storage output plugin for Fluentd"
   spec.homepage      = "https://github.com/daichirata/fluent-plugin-gcs"
@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency "fluentd", "~> 0.12.0"
   spec.add_runtime_dependency "google-cloud-storage", "~> 0.23.2"
+  spec.add_runtime_dependency 'lzo', '~> 0.1.0'
 
   spec.add_development_dependency "bundler", "~> 1.13"
   spec.add_development_dependency "rake", "~> 10.0"

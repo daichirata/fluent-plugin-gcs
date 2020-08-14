@@ -7,6 +7,6 @@ rvm:
 
 before_install:
   - gem update bundler
-  - apt-get install -y liblzo2
+  - sudo apt-get install -y liblzo2
 
 script: bundle exec rake test

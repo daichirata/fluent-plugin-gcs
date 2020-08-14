@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-gcs"
   spec.version       = Fluent::GCSPlugin::VERSION
   spec.authors       = ["Daichi HIRATA", "Bohdan Snisar"]
-  spec.email         = ["hirata.daichi@gmail.com", "bsnisar@softserveinc.com"]
+  spec.email         = ["hirata.daichi@gmail.com", "bogdan.sns@gmail.com"]
   spec.summary       = "Google Cloud Storage output plugin for Fluentd"
   spec.description   = "Google Cloud Storage output plugin for Fluentd"
   spec.homepage      = "https://github.com/daichirata/fluent-plugin-gcs"

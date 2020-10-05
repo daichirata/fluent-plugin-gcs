@@ -233,7 +233,7 @@ Doesn't check if an object exists in GCS before writing. Default is false.
 
 Allows to avoid granting of `storage.objects.get` permission.
 
-Warning! If the obkect exists and `storage.objects.delete` permission is not
+Warning! If the object exists and `storage.objects.delete` permission is not
 granted, there will be an unrecoverable error. Usage of `%{hex_random}` is
 recommended.
 

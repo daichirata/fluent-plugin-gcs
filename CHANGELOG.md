@@ -2,6 +2,11 @@
 
 New features / Enhancements
 
+## [0.4.1] - 2020/04/17
+
+New features
+- [Support blind write to GSC](https://github.com/daichirata/fluent-plugin-gcs/pull/14)
+
 ## [0.4.0] - 2019/04/01
 
 New features / Enhancements

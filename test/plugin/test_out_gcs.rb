@@ -19,6 +19,9 @@ class GCSOutputTest < Test::Unit::TestCase
       @type memory
       timekey_use_utc true
     </buffer>
+    <system>
+      log_level debug
+    </system>
   EOC
 
   def create_driver(conf = CONFIG)

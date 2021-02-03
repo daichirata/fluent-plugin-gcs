@@ -15,6 +15,7 @@ module Fluent::Plugin
     def initialize
       super
       require "google/cloud/storage"
+      Google::Apis.logger = log
     end
 
     config_param :project, :string,  default: nil,
@@ -130,7 +131,7 @@ module Fluent::Plugin
         }
         opts.merge!(@encryption_opts)
 
-        log.debug { "out_gcs: upload chunk:#{chunk.key} to gcs://#{@bucket}/#{path} options: #{opts}" }
+        log.debug "out_gcs: upload chunk:#{chunk.key} to gcs://#{@bucket}/#{path} options: #{opts}"
         @gcs_bucket.upload_file(obj.path, path, opts)
       end
     end
@@ -170,23 +171,30 @@ module Fluent::Plugin
         "%{file_extension}" => @object_creator.file_extension,
         "%{hex_random}" => hex_random(chunk),
         "%{hostname}" => Socket.gethostname,
-        "%{index}" => i,
         "%{path}" => @path,
         "%{time_slice}" => time_slice,
         "%{uuid_flush}" => SecureRandom.uuid,
       }
-      path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
-      path = extract_placeholders(path, chunk)
-      return path unless check_object_exists(path)
 
-      if path == prev
-        if @overwrite
-          log.warn "object `#{path}` already exists but overwrites it"
-          return path
+      until i < 0 do # Until overflow
+        tags["%{index}"] = i
+        path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
+        path = extract_placeholders(path, chunk)
+        log.debug "checking if GCS path `#{path}` exists"
+        return path unless check_object_exists(path)
+
+        if path == prev
+          if @overwrite
+            log.warn "object `#{path}` already exists but overwrites it"
+            return path
+          end
+          raise "object `#{path}` already exists"
         end
-        raise "object `#{path}` already exists"
+
+        i += 1
       end
-      generate_path(chunk, i + 1, path)
+
+      raise "cannot find an unoccupied GCS path"
     end
 
     # This is stolen from Fluentd

@@ -3,6 +3,9 @@
 
 Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluentd).
 
+## Disclaimer
+This repos is a fork of https://github.com/daichirata/fluent-plugin-gcs with support of *lzo* extension.
+
 ## Requirements
 
 | fluent-plugin-gcs  | fluentd    | ruby   |
@@ -12,9 +15,12 @@ Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluen
 
 ## Installation
 
-``` shell
-$ gem install fluent-plugin-gcs -v "~> 0.3" --no-document # for fluentd v0.12 or later
-$ gem install fluent-plugin-gcs -v "0.4.0" --no-document # for fluentd v0.14 or later
+The *LZO* library is not bundled with this gem. It must be installed beforehand.
+
+See https://www.rubydoc.info/gems/lzo/0.1.0 for details.
+
+```shell
+bundle exec rake build
 ```
 
 ## Examples
@@ -134,6 +140,7 @@ to decide keys dynamically.
   * gzip - gz
   * json - json
   * text - txt
+  * lzo - lzo
 * `%{uuid_flush}` a uuid that is replaced everytime the buffer will be flushed
 * `%{hex_random}` a random hex string that is replaced for each buffer chunk, not assured to be unique. You can configure the length of string with a `hex_random_length` parameter (Default: 4).
 * `%{hostname}` is set to the standard host name of the system of the running server.

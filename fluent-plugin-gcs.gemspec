@@ -22,4 +22,5 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency "fluentd", [">= 0.14.22", "< 2"]
   spec.add_runtime_dependency "google-cloud-storage", "~> 1.1"
+  spec.add_runtime_dependency 'lzo', '~> 0.1.0'
 end

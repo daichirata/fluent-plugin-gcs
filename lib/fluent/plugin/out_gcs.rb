@@ -131,7 +131,7 @@ module Fluent::Plugin
         opts.merge!(@encryption_opts)
 
         log.debug { "out_gcs: upload chunk:#{chunk.key} to gcs://#{@bucket}/#{path} options: #{opts}" }
-        @gcs_bucket.upload_file(obj.path, path, opts)
+        @gcs_bucket.upload_file(obj.path, path, **opts)
       end
     end
 
@@ -153,7 +153,7 @@ module Fluent::Plugin
 
     def check_object_exists(path)
       if !@blind_write
-        return @gcs_bucket.find_file(path, @encryption_opts)
+        return @gcs_bucket.find_file(path, **@encryption_opts)
       else
         return false
       end

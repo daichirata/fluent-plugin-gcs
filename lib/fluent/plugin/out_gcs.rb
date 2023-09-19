@@ -160,7 +160,7 @@ module Fluent::Plugin
       end
     end
 
-    def generate_path(chunk, i = 0, prev = nil)
+    def generate_path(chunk)
       metadata = chunk.metadata
       time_slice = if metadata.timekey.nil?
                      ''.freeze
@@ -173,14 +173,17 @@ module Fluent::Plugin
         "%{hostname}" => Socket.gethostname,
         "%{path}" => @path,
         "%{time_slice}" => time_slice,
-        "%{uuid_flush}" => SecureRandom.uuid,
       }
 
+      prev = nil
+      i = 0
+
       until i < 0 do # Until overflow
+        tags["%{uuid_flush}"] = SecureRandom.uuid
         tags["%{index}"] = i
+
         path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
         path = extract_placeholders(path, chunk)
-        log.debug "checking if GCS path `#{path}` exists"
         return path unless check_object_exists(path)
 
         if path == prev
@@ -192,6 +195,7 @@ module Fluent::Plugin
         end
 
         i += 1
+        prev = path
       end
 
       raise "cannot find an unoccupied GCS path"

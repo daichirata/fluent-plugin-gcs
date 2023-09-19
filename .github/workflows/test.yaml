@@ -20,5 +20,7 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true
+    - name: Install dependencies
+      run: sudo apt-get install -y liblzo2-dev
     - name: Run tests
       run: bundle exec rake test

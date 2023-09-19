@@ -15,6 +15,7 @@ module Fluent::Plugin
     def initialize
       super
       require "google/cloud/storage"
+      Google::Apis.logger = log
     end
 
     config_param :project, :string,  default: nil,
@@ -159,7 +160,7 @@ module Fluent::Plugin
       end
     end
 
-    def generate_path(chunk, i = 0, prev = nil)
+    def generate_path(chunk)
       metadata = chunk.metadata
       time_slice = if metadata.timekey.nil?
                      ''.freeze
@@ -170,23 +171,34 @@ module Fluent::Plugin
         "%{file_extension}" => @object_creator.file_extension,
         "%{hex_random}" => hex_random(chunk),
         "%{hostname}" => Socket.gethostname,
-        "%{index}" => i,
         "%{path}" => @path,
         "%{time_slice}" => time_slice,
-        "%{uuid_flush}" => SecureRandom.uuid,
       }
-      path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
-      path = extract_placeholders(path, chunk)
-      return path unless check_object_exists(path)
 
-      if path == prev
-        if @overwrite
-          log.warn "object `#{path}` already exists but overwrites it"
-          return path
+      prev = nil
+      i = 0
+
+      until i < 0 do # Until overflow
+        tags["%{uuid_flush}"] = SecureRandom.uuid
+        tags["%{index}"] = i
+
+        path = @object_key_format.gsub(Regexp.union(tags.keys), tags)
+        path = extract_placeholders(path, chunk)
+        return path unless check_object_exists(path)
+
+        if path == prev
+          if @overwrite
+            log.warn "object `#{path}` already exists but overwrites it"
+            return path
+          end
+          raise "object `#{path}` already exists"
         end
-        raise "object `#{path}` already exists"
+
+        i += 1
+        prev = path
       end
-      generate_path(chunk, i + 1, path)
+
+      raise "cannot find an unoccupied GCS path"
     end
 
     # This is stolen from Fluentd

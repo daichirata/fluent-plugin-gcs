@@ -3,9 +3,6 @@
 
 Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluentd).
 
-## Disclaimer
-This repos is a fork of https://github.com/daichirata/fluent-plugin-gcs with support of *lzo* extension.
-
 ## Requirements
 
 | fluent-plugin-gcs  | fluentd    | ruby   |
@@ -14,6 +11,11 @@ This repos is a fork of https://github.com/daichirata/fluent-plugin-gcs with sup
 |  < 0.4.0           | >= v0.12.0 | >= 1.9 |
 
 ## Installation
+
+``` shell
+$ gem install fluent-plugin-gcs -v "~> 0.3" --no-document # for fluentd v0.12 or later
+$ gem install fluent-plugin-gcs -v "0.4.0" --no-document # for fluentd v0.14 or later
+```
 
 The *LZO* library is not bundled with this gem. It must be installed beforehand.
 

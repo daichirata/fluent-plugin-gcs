@@ -21,10 +21,6 @@ The *LZO* library is not bundled with this gem. It must be installed beforehand.
 
 See https://www.rubydoc.info/gems/lzo/0.1.0 for details.
 
-```shell
-bundle exec rake build
-```
-
 ## Examples
 
 ### For v0.14 style

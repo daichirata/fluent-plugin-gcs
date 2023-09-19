@@ -1,6 +1,5 @@
 require "tempfile"
 require "zlib"
-require "lzo"
 
 module Fluent
   module GCS
@@ -13,6 +12,7 @@ module Fluent
       when :text
         Fluent::GCS::TextObjectCreator.new
       when :lzo
+        require "lzo"
         Fluent::GCS::LzoObjectCreator.new(transcoding)
       end
     end

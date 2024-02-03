@@ -22,6 +22,8 @@ module Fluent::Plugin
                  desc: "Project identifier for GCS"
     config_param :keyfile, :string, default: nil,
                  desc: "Path of GCS service account credentials JSON file"
+    config_param :credentials_json, :hash, default: nil, secret: true,
+                 desc: "GCS service account credentials in JSON format"
     config_param :client_retries, :integer, default: nil,
                  desc: "Number of times to retry requests on server error"
     config_param :client_timeout, :integer, default: nil,
@@ -94,12 +96,18 @@ module Fluent::Plugin
       # TODO: Remove time_slice_format when end of support compat_parameters
       @configured_time_slice_format = conf['time_slice_format']
       @time_slice_with_tz = Fluent::Timezone.formatter(@timekey_zone, @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey']))
+
+      if @credentials_json
+        @credentials = @credentials_json
+      else
+        @credentials = keyfile
+      end
     end
 
     def start
       @gcs = Google::Cloud::Storage.new(
         project: @project,
-        keyfile: @keyfile,
+        keyfile: @credentials,
         retries: @client_retries,
         timeout: @client_timeout
       )

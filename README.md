@@ -159,7 +159,7 @@ Change one line format in the GCS object. You can use serveral format:
 * ltsv
 * single_value
 
-See also [official Formatter article](http://docs.fluentd.org/articles/formatter-plugin-overview).
+See also [official Formatter article](https://docs.fluentd.org/formatter).
 
 **auto_create_bucket**
 

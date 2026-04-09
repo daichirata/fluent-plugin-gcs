@@ -51,6 +51,64 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
     end
   end
 
+  sub_test_case "GZipCommandObjectCreator" do
+    class DummyLog
+      attr_reader :warnings
+
+      def initialize
+        @warnings = []
+      end
+
+      def warn(message)
+        @warnings << message
+      end
+    end
+
+    def test_content_type_and_content_encoding
+      c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: true, command_parameter: "", log: nil)
+      assert_equal "text/plain", c.content_type
+      assert_equal "gzip", c.content_encoding
+
+      c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: false, command_parameter: "", log: nil)
+      assert_equal "application/gzip", c.content_type
+      assert_equal nil, c.content_encoding
+    end
+
+    def test_file_extension
+      c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: true, command_parameter: "", log: nil)
+      assert_equal "gz", c.file_extension
+
+      c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: false, command_parameter: "", log: nil)
+      assert_equal "gz", c.file_extension
+    end
+
+    def test_write
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: true, command_parameter: "", log: nil)
+        c.write(DummyChunk.new, f)
+        Zlib::GzipReader.open(f.path) do |gz|
+          assert_equal DUMMY_DATA, gz.read
+        end
+      end
+    end
+
+    def test_write_with_command_parameter
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: false, command_parameter: "-1", log: nil)
+        c.write(DummyChunk.new, f)
+        Zlib::GzipReader.open(f.path) do |gz|
+          assert_equal DUMMY_DATA, gz.read
+        end
+      end
+    end
+  end
+
   sub_test_case "TextObjectCreator" do
     def test_content_type_and_content_encoding
       c = Fluent::GCS::TextObjectCreator.new

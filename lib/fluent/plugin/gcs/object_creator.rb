@@ -1,12 +1,19 @@
 require "tempfile"
 require "zlib"
+require "open3"
 
 module Fluent
   module GCS
-    def self.discovered_object_creator(store_as, transcoding: nil)
+    def self.discovered_object_creator(store_as, transcoding: nil, command_parameter: nil, log: nil)
       case store_as
       when :gzip
         Fluent::GCS::GZipObjectCreator.new(transcoding)
+      when :gzip_command
+        Fluent::GCS::GZipCommandObjectCreator.new(
+          transcoding: transcoding,
+          command_parameter: command_parameter,
+          log: log
+        )
       when :json
         Fluent::GCS::JSONObjectCreator.new
       when :text
@@ -59,6 +66,61 @@ module Fluent
       end
 
       def write(chunk, io)
+        writer = Zlib::GzipWriter.new(io)
+        chunk.write_to(writer)
+        writer.finish
+      end
+    end
+
+    class GZipCommandObjectCreator < ObjectCreator
+      def initialize(transcoding:, command_parameter:, log:)
+        @transcoding = transcoding
+        @command_parameter = command_parameter || ""
+        @log = log
+        check_gzip_command
+      end
+
+      def content_type
+        @transcoding ? "text/plain" : "application/gzip"
+      end
+
+      def content_encoding
+        @transcoding ? "gzip" : nil
+      end
+
+      def file_extension
+        "gz"
+      end
+
+      def write(chunk, io)
+        Tempfile.create("gzip-chunk-tmp") do |chunk_file|
+          chunk_file.binmode
+          chunk.write_to(chunk_file)
+          chunk_file.close
+
+          command = "gzip #{@command_parameter} -c #{chunk_file.path}"
+          result = system("#{command} > #{io.path}")
+
+          unless result
+            @log&.warn("failed to execute gzip command. Fallback to GzipWriter. status = #{$?}")
+            io.truncate(0)
+            io.rewind
+            fallback_to_gzip_writer(chunk, io)
+          end
+        end
+      end
+
+      private
+
+      def check_gzip_command
+        begin
+          Open3.capture3("gzip -V")
+        rescue Errno::ENOENT
+          raise Fluent::ConfigError, "'gzip' utility must be in PATH for gzip_command compression"
+        end
+      end
+
+      def fallback_to_gzip_writer(chunk, io)
         writer = Zlib::GzipWriter.new(io)
         chunk.write_to(writer)
         writer.finish

@@ -5,9 +5,14 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in fluent-plugin-gcs.gemspec
 gemspec
 
-gem "rake", "~> 13.0"
-gem "rr", "= 1.1.2"
-gem "test-unit", ">= 3.0.8"
-gem "test-unit-rr", ">= 1.0.3"
-gem "timecop"
-gem "solargraph"
+group :test do
+  gem "rake", "~> 13.0"
+  gem "test-unit", ">= 3.0.8"
+  gem "mocha", "~> 2.0"
+  gem "timecop"
+  gem "bundler-audit", "~> 0.9"
+end
+
+group :development, optional: true do
+  gem "solargraph"
+end

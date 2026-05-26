@@ -212,7 +212,7 @@ For the tag `app.web` on host `web1`, this writes objects such as `logs/app.web/
 
 ### Fine-grained 1-minute partitions
 
-When `timekey` is under an hour, `%{time_slice}` automatically resolves to minute granularity (`%Y%m%d%H%M`). The default `object_key_format` already includes `%{index}`, so multiple flushes within the same minute are written as separate objects without collision.
+When `timekey` is under an hour, `%{time_slice}` automatically resolves to minute granularity (`%Y%m%d%H%M`).
 
 ```aconf
 <match app.**>

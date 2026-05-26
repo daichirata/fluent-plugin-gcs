@@ -212,7 +212,7 @@ For the tag `app.web` on host `web1`, this writes objects such as `logs/app.web/
 
 ### Fine-grained 1-minute partitions
 
-When `timekey` is under an hour, `%{time_slice}` automatically resolves to minute granularity (`%Y%m%d%H%M`). Add `%{hex_random}` so that multiple flushes within the same minute never collide.
+When `timekey` is under an hour, `%{time_slice}` automatically resolves to minute granularity (`%Y%m%d%H%M`). The default `object_key_format` already includes `%{index}`, so multiple flushes within the same minute are written as separate objects without collision.
 
 ```aconf
 <match app.**>
@@ -220,7 +220,6 @@ When `timekey` is under an hour, `%{time_slice}` automatically resolves to minut
 
   bucket YOUR_GCS_BUCKET_NAME
   path logs/
-  object_key_format %{path}%{time_slice}_%{hex_random}.%{file_extension}
 
   <buffer time>
     @type file
@@ -232,7 +231,7 @@ When `timekey` is under an hour, `%{time_slice}` automatically resolves to minut
 </match>
 ```
 
-This writes objects such as `logs/202401011230_a1b2.gz`, one (or more) per minute.
+This writes objects such as `logs/202401011230_0.gz`, one (or more) per minute.
 
 ### Fast compression with the external gzip
 
@@ -277,6 +276,31 @@ Using the default `object_key_format`, this writes objects such as `logs/2024010
 ```
 
 Using the default `object_key_format`, this writes objects such as `archive/20240101_0.gz`, one per day, stored in the Coldline class.
+
+### Write without the get permission (blind_write)
+
+`blind_write true` skips the existence check, so the `storage.objects.get` permission is not required. Because `%{index}` does not work in this mode, include `%{hex_random}` or `%{uuid_flush}` to keep keys unique.
+
+```aconf
+<match app.**>
+  @type gcs
+
+  bucket YOUR_GCS_BUCKET_NAME
+  path logs/
+  object_key_format %{path}%{time_slice}_%{hex_random}.%{file_extension}
+  blind_write true
+
+  <buffer time>
+    @type file
+    path /var/log/fluent/gcs
+    timekey 1h
+    timekey_wait 10m
+    timekey_use_utc true
+  </buffer>
+</match>
+```
+
+This writes objects such as `logs/2024010112_a1b2.gz`, with a per-chunk random suffix instead of an incrementing index.
 
 ## Development
 

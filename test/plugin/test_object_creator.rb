@@ -12,6 +12,23 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
     end
   end
 
+  class DummyObjectCreator < Fluent::GCS::ObjectCreator
+    attr_reader :written
+
+    def content_type
+      "text/plain"
+    end
+
+    def file_extension
+      "txt"
+    end
+
+    def write(chunk, io)
+      @written = true
+      chunk.write_to(io)
+    end
+  end
+
   sub_test_case "GZipObjectCreator" do
     def test_content_type_and_content_encoding
       c = Fluent::GCS::GZipObjectCreator.new(true)
@@ -136,6 +153,30 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
         ensure
           ENV["PATH"] = original_path
         end
+      end
+    end
+
+    def test_initialize_raises_config_error_when_gzip_is_not_in_path
+      Open3.expects(:capture3).with("gzip -V").raises(Errno::ENOENT)
+
+      err = assert_raise(Fluent::ConfigError) do
+        Fluent::GCS::GZipCommandObjectCreator.new(transcoding: false, command_parameter: "", log: nil)
+      end
+      assert_equal "'gzip' utility must be in PATH for gzip_command compression", err.message
+    end
+
+  end
+
+  sub_test_case "ObjectCreator" do
+    def test_create_yields_binmode_tempfile_with_written_content
+      creator = DummyObjectCreator.new
+
+      creator.create(DummyChunk.new) do |f|
+        assert_equal true, creator.written
+        assert_equal true, f.binmode?
+        assert_equal true, f.sync
+        f.rewind
+        assert_equal DUMMY_DATA, f.read
       end
     end
   end

@@ -34,6 +34,21 @@ class GCSOutputTest < Test::Unit::TestCase
     args.join("\n")
   end
 
+  def upload_opts(overrides = {})
+    {
+      metadata: {},
+      acl: nil,
+      storage_class: nil,
+      content_type: "application/gzip",
+      content_encoding: nil,
+      encryption_key: nil,
+    }.merge(overrides)
+  end
+
+  def enc_opts(overrides = {})
+    { encryption_key: nil }.merge(overrides)
+  end
+
   sub_test_case "configure" do
     def test_configure
       driver = create_driver
@@ -88,17 +103,45 @@ class GCSOutputTest < Test::Unit::TestCase
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::GZipCommandObjectCreator)
       assert_equal "-1", driver.instance.gzip_command_parameter
     end
+
+    def test_configure_with_credentials_json
+      driver = create_driver(<<-EOC)
+        bucket test_bucket
+        credentials_json {"type":"service_account","project_id":"x"}
+        <buffer>
+          @type memory
+          timekey_use_utc true
+        </buffer>
+      EOC
+      expected = {"type" => "service_account", "project_id" => "x"}
+      assert_equal expected, driver.instance.credentials_json
+      assert_equal expected, driver.instance.instance_variable_get(:@credentials)
+    end
+
+    data(
+      "invalid store_as"     => ["store_as", "invalid"],
+      "invalid acl"          => ["acl", "invalid"],
+      "invalid storage_class" => ["storage_class", "invalid"],
+    )
+    def test_configure_rejects_invalid_enum(data)
+      key, value = data
+      assert_raise Fluent::ConfigError do
+        create_driver(config(CONFIG, "#{key} #{value}"))
+      end
+    end
   end
 
   def test_start
-    bucket = mock!.bucket("test_bucket") { stub! }
+    bucket = mock("bucket")
+    storage = mock("storage")
+    storage.expects(:bucket).with("test_bucket").returns(bucket)
 
-    mock(Google::Cloud::Storage).new(
+    Google::Cloud::Storage.expects(:new).with(
       project: "test_project",
       keyfile: "test_keyfile",
       retries: 1,
       timeout: 2,
-    ) { bucket }
+    ).returns(storage)
 
     driver = create_driver <<-EOC
       project test_project
@@ -115,11 +158,36 @@ class GCSOutputTest < Test::Unit::TestCase
     driver.instance.start
   end
 
+  def test_start_with_credentials_json
+    bucket = mock("bucket")
+    storage = mock("storage")
+    storage.expects(:bucket).with("test_bucket").returns(bucket)
+
+    credentials = {"type" => "service_account", "project_id" => "x"}
+    Google::Cloud::Storage.expects(:new).with(
+      project: nil,
+      keyfile: credentials,
+      retries: nil,
+      timeout: nil,
+    ).returns(storage)
+
+    driver = create_driver <<-EOC
+      bucket test_bucket
+      credentials_json {"type":"service_account","project_id":"x"}
+      <buffer>
+        @type memory
+        timekey_use_utc true
+      </buffer>
+    EOC
+
+    driver.instance.start
+  end
+
   def test_ensure_bucket
-    bucket = stub!
-    bucket.bucket { nil }
-    bucket.create_bucket { "ok" }
-    stub(Google::Cloud::Storage).new { bucket }
+    storage = mock("storage")
+    storage.stubs(:bucket).returns(nil)
+    storage.stubs(:create_bucket).returns("ok")
+    Google::Cloud::Storage.stubs(:new).returns(storage)
 
     driver = create_driver <<-EOC
       bucket test_bucket
@@ -130,8 +198,14 @@ class GCSOutputTest < Test::Unit::TestCase
     EOC
     driver.instance.start
     assert_equal "ok", driver.instance.instance_variable_get(:@gcs_bucket)
+  end
 
-    driver2 = create_driver <<-EOC
+  def test_ensure_bucket_raises_when_auto_create_disabled
+    storage = mock("storage")
+    storage.stubs(:bucket).returns(nil)
+    Google::Cloud::Storage.stubs(:new).returns(storage)
+
+    driver = create_driver <<-EOC
       bucket test_bucket
       auto_create_bucket false
       <buffer>
@@ -139,19 +213,39 @@ class GCSOutputTest < Test::Unit::TestCase
         timekey_use_utc true
       </buffer>
     EOC
-    assert_raise do
-      driver2.instance.start
+    err = assert_raise(RuntimeError) { driver.instance.start }
+    assert_equal "bucket `test_bucket` does not exist", err.message
+  end
+
+  def test_multi_workers_ready
+    driver = create_driver
+    assert_equal true, driver.instance.multi_workers_ready?
+  end
+
+  sub_test_case "private helpers" do
+    def test_timekey_to_timeformat
+      driver = create_driver
+
+      assert_equal "", driver.instance.send(:timekey_to_timeformat, nil)
+      assert_equal "%Y%m%d%H%M%S", driver.instance.send(:timekey_to_timeformat, 0)
+      assert_equal "%Y%m%d%H%M%S", driver.instance.send(:timekey_to_timeformat, 59)
+      assert_equal "%Y%m%d%H%M", driver.instance.send(:timekey_to_timeformat, 60)
+      assert_equal "%Y%m%d%H%M", driver.instance.send(:timekey_to_timeformat, 3599)
+      assert_equal "%Y%m%d%H", driver.instance.send(:timekey_to_timeformat, 3600)
+      assert_equal "%Y%m%d%H", driver.instance.send(:timekey_to_timeformat, 86_399)
+      assert_equal "%Y%m%d", driver.instance.send(:timekey_to_timeformat, 86_400)
     end
+
   end
 
   sub_test_case "foramt" do
     setup do
-      bucket = stub!
-      bucket.find_file { false }
-      bucket.upload_file
-      storage = stub!
-      storage.bucket { bucket }
-      stub(Google::Cloud::Storage).new { storage }
+      bucket = mock("bucket")
+      bucket.stubs(:find_file).returns(false)
+      bucket.stubs(:upload_file)
+      storage = mock("storage")
+      storage.stubs(:bucket).returns(bucket)
+      Google::Cloud::Storage.stubs(:new).returns(storage)
 
       @time = event_time("2016-01-01 12:00:00 UTC")
     end
@@ -245,16 +339,16 @@ class GCSOutputTest < Test::Unit::TestCase
 
   sub_test_case "write" do
     def check_upload(conf, path = nil, enc_opts = nil, upload_opts = nil, &block)
-      bucket = mock!
+      bucket = mock("bucket")
       if block.nil?
-        bucket.find_file(path, enc_opts) { false }
-        bucket.upload_file(anything, path, upload_opts.merge(enc_opts))
+        bucket.expects(:find_file).with(path, **enc_opts).returns(false)
+        bucket.expects(:upload_file).with(anything, path, **upload_opts.merge(enc_opts))
       else
         block.call(bucket)
       end
-      storage = stub!
-      storage.bucket { bucket }
-      stub(Google::Cloud::Storage).new { storage }
+      storage = mock("storage")
+      storage.stubs(:bucket).returns(bucket)
+      Google::Cloud::Storage.stubs(:new).returns(storage)
 
       driver = create_driver(conf)
       driver.run(default_tag: "test") do
@@ -264,134 +358,40 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_write_with_gzip
       conf = config(CONFIG, "store_as gzip")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
     end
 
     def test_write_with_transcoding
       conf = config(CONFIG, "store_as gzip", "transcoding true")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "text/plain",
-        content_encoding: "gzip",
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.gz", enc_opts,
+                   upload_opts(content_type: "text/plain", content_encoding: "gzip"))
     end
 
     def test_write_with_text
       conf = config(CONFIG, "store_as text")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "text/plain",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.txt", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.txt", enc_opts,
+                   upload_opts(content_type: "text/plain"))
     end
 
     def test_write_with_json
       conf = config(CONFIG, "store_as json")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/json",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.json", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.json", enc_opts,
+                   upload_opts(content_type: "application/json"))
     end
 
     def test_write_with_gzip_command
       conf = config(CONFIG, "store_as gzip_command")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
       check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
     end
 
     def test_write_with_gzip_command_and_transcoding
       conf = config(CONFIG, "store_as gzip_command", "transcoding true")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "text/plain",
-        content_encoding: "gzip",
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.gz", enc_opts,
+                   upload_opts(content_type: "text/plain", content_encoding: "gzip"))
     end
 
     def test_write_with_utc
       conf = config(CONFIG)
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
       Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
         check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
       end
@@ -411,79 +411,60 @@ class GCSOutputTest < Test::Unit::TestCase
         </buffer>
       CONFIG
 
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
       Timecop.freeze(Time.parse("2016-01-02 01:00:00 JST")) do
         check_upload(conf, "log/test/20160101_0.gz", enc_opts, upload_opts)
       end
     end
 
+    def test_write_without_timekey
+      conf = <<-CONFIG
+        project test_project
+        keyfile test_keyfile
+        bucket test_bucket
+        path log/
+        object_key_format %{path}%{time_slice}%{index}.%{file_extension}
+        <buffer tag>
+          @type memory
+        </buffer>
+      CONFIG
+
+      check_upload(conf, "log/0.gz", enc_opts, upload_opts)
+    end
+
+    def test_write_with_custom_time_slice_format
+      conf = <<-CONFIG
+        project test_project
+        keyfile test_keyfile
+        bucket test_bucket
+        path log/
+        time_slice_format %Y/%m/%d/%H
+        <buffer>
+          @type memory
+          timekey 3600
+          timekey_use_utc true
+        </buffer>
+      CONFIG
+
+      check_upload(conf, "log/2016/01/01/15_0.gz", enc_opts, upload_opts)
+    end
+
     def test_write_with_encryption
       conf = config(CONFIG, "encryption_key aaa")
-
-      enc_opts = {
-        encryption_key: "aaa",
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: "aaa",
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.gz",
+                   enc_opts(encryption_key: "aaa"),
+                   upload_opts(encryption_key: "aaa"))
     end
 
     def test_write_with_acl
       conf = config(CONFIG, "acl auth_read")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: :auth_read,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.gz", enc_opts,
+                   upload_opts(acl: :auth_read))
     end
 
     def test_write_with_storage_class
       conf = config(CONFIG, "storage_class regional")
-
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: :regional,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.gz", enc_opts,
+                   upload_opts(storage_class: :regional))
     end
 
     def test_write_with_object_metadata
@@ -498,90 +479,52 @@ class GCSOutputTest < Test::Unit::TestCase
         </object_metadata>
       EOM
 
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {"test-key-1" => "test-value-1", "test-key-2" => "test-value-2"},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+      check_upload(conf, "log/20160101_0.gz", enc_opts,
+                   upload_opts(metadata: {"test-key-1" => "test-value-1", "test-key-2" => "test-value-2"}))
     end
 
     def test_write_with_custom_object_key_format
       conf = config(CONFIG, "object_key_format %{path}%{file_extension}/%{hex_random}/%{hostname}/%{index}/%{time_slice}/%{uuid_flush}")
 
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
-      any_instance_of(Fluent::Plugin::Buffer::MemoryChunk) do |b|
-        # Memo: Digest::MD5.hexdigest("unique_id") => "69080cee5b6d4c35a8bbf5c48335fe08"
-        stub(b).unique_id { "unique_id" }
-      end
-      stub(SecureRandom).uuid { "uuid1" }
-      stub(SecureRandom).uuid { "uuid2" }
-      stub(Socket).gethostname { "test-hostname" }
+      # Memo: Digest::MD5.hexdigest("unique_id") => "69080cee5b6d4c35a8bbf5c48335fe08"
+      Fluent::Plugin::Buffer::MemoryChunk.any_instance.stubs(:unique_id).returns("unique_id")
+      SecureRandom.stubs(:uuid).returns("uuid1", "uuid2")
+      Socket.stubs(:gethostname).returns("test-hostname")
 
       check_upload(conf) do |bucket|
-        bucket.find_file(anything, enc_opts) { true }
-        bucket.find_file(anything, enc_opts) { false }
-        bucket.upload_file(anything, "log/gz/6908/test-hostname/1/20160101/uuid2", upload_opts.merge(enc_opts))
+        bucket.stubs(:find_file).with(anything, **enc_opts).returns(true).then.returns(false)
+        bucket.expects(:upload_file).with(anything, "log/gz/6908/test-hostname/1/20160101/uuid2", **upload_opts.merge(enc_opts))
       end
     end
 
     def test_write_with_overwrite_true
       conf = config(CONFIG, "object_key_format %{path}%{time_slice}.%{file_extension}", "overwrite true")
 
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      upload_opts = {
-        metadata: {},
-        acl: nil,
-        storage_class: nil,
-        content_type: "application/gzip",
-        content_encoding: nil,
-        encryption_key: nil,
-      }.merge(enc_opts)
-
       check_upload(conf) do |bucket|
-        bucket.find_file(anything, enc_opts) { true }
-        bucket.find_file(anything, enc_opts) { true }
-        bucket.upload_file(anything, "log/20160101.gz", upload_opts.merge(enc_opts))
+        bucket.stubs(:find_file).with(anything, **enc_opts).returns(true)
+        bucket.expects(:upload_file).with(anything, "log/20160101.gz", **upload_opts.merge(enc_opts))
       end
     end
 
     def test_write_with_overwrite_false
       conf = config(CONFIG, "object_key_format %{path}%{time_slice}.%{file_extension}", "overwrite false")
 
-      enc_opts = {
-        encryption_key: nil,
-      }
-
-      assert_raise do
+      err = assert_raise(RuntimeError) do
         silenced do
           check_upload(conf) do |bucket|
-            bucket.find_file(anything, enc_opts) { true }
-            bucket.find_file(anything, enc_opts) { true }
+            bucket.stubs(:find_file).with(anything, **enc_opts).returns(true)
           end
         end
+      end
+      assert_equal "object `log/20160101.gz` already exists", err.message
+    end
+
+    def test_write_with_blind_write
+      conf = config(CONFIG, "blind_write true")
+
+      check_upload(conf) do |bucket|
+        bucket.expects(:find_file).never
+        bucket.expects(:upload_file).with(anything, "log/20160101_0.gz", **upload_opts.merge(enc_opts))
       end
     end
   end

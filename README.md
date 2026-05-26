@@ -206,6 +206,8 @@ Attach arbitrary `x-goog-meta-*` headers to uploaded objects with one or more `<
 </match>
 ```
 
+For the tag `app.web` on host `web1`, this writes objects such as `logs/app.web/20240101/web1_0.gz`.
+
 ### Fine-grained 1-minute partitions
 
 When `timekey` is under an hour, `%{time_slice}` automatically resolves to minute granularity (`%Y%m%d%H%M`). Add `%{hex_random}` so that multiple flushes within the same minute never collide.
@@ -250,6 +252,8 @@ This writes objects such as `logs/202401011230_a1b2.gz`, one (or more) per minut
 </match>
 ```
 
+Using the default `object_key_format`, this writes objects such as `logs/2024010112_0.gz`, one per hourly slice.
+
 ### Cost-optimized cold storage
 
 ```aconf
@@ -269,6 +273,8 @@ This writes objects such as `logs/202401011230_a1b2.gz`, one (or more) per minut
   </buffer>
 </match>
 ```
+
+Using the default `object_key_format`, this writes objects such as `archive/20240101_0.gz`, one per day, stored in the Coldline class.
 
 ## Development
 

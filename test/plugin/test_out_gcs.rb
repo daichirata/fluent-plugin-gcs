@@ -77,6 +77,17 @@ class GCSOutputTest < Test::Unit::TestCase
       driver = create_driver(config(CONFIG, "store_as json"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::JSONObjectCreator)
     end
+
+    def test_configure_with_gzip_command_object_creator
+      driver = create_driver(config(CONFIG, "store_as gzip_command"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::GZipCommandObjectCreator)
+    end
+
+    def test_configure_with_gzip_command_parameter
+      driver = create_driver(config(CONFIG, "store_as gzip_command", "gzip_command_parameter -1"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::GZipCommandObjectCreator)
+      assert_equal "-1", driver.instance.gzip_command_parameter
+    end
   end
 
   def test_start
@@ -325,6 +336,44 @@ class GCSOutputTest < Test::Unit::TestCase
       }.merge(enc_opts)
 
       check_upload(conf, "log/20160101_0.json", enc_opts, upload_opts)
+    end
+
+    def test_write_with_gzip_command
+      conf = config(CONFIG, "store_as gzip_command")
+
+      enc_opts = {
+        encryption_key: nil,
+      }
+
+      upload_opts = {
+        metadata: {},
+        acl: nil,
+        storage_class: nil,
+        content_type: "application/gzip",
+        content_encoding: nil,
+        encryption_key: nil,
+      }.merge(enc_opts)
+
+      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
+    end
+
+    def test_write_with_gzip_command_and_transcoding
+      conf = config(CONFIG, "store_as gzip_command", "transcoding true")
+
+      enc_opts = {
+        encryption_key: nil,
+      }
+
+      upload_opts = {
+        metadata: {},
+        acl: nil,
+        storage_class: nil,
+        content_type: "text/plain",
+        content_encoding: "gzip",
+        encryption_key: nil,
+      }.merge(enc_opts)
+
+      check_upload(conf, "log/20160101_0.gz", enc_opts, upload_opts)
     end
 
     def test_write_with_utc

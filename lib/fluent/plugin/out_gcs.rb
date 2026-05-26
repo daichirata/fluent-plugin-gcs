@@ -34,10 +34,12 @@ module Fluent::Plugin
                  desc: "Format of GCS object keys"
     config_param :path, :string, default: "",
                  desc: "Path prefix of the files on GCS"
-    config_param :store_as, :enum, list: %i(gzip json text), default: :gzip,
+    config_param :store_as, :enum, list: %i(gzip gzip_command json text), default: :gzip,
                  desc: "Archive format on GCS"
     config_param :transcoding, :bool, default: false,
                  desc: "Enable the decompressive form of transcoding"
+    config_param :gzip_command_parameter, :string, default: "",
+                 desc: "Additional parameters for gzip command (e.g. '-1' for fast compression)"
     config_param :auto_create_bucket, :bool, default: true,
                  desc: "Create GCS bucket if it does not exists"
     config_param :hex_random_length, :integer, default: 4,
@@ -91,7 +93,12 @@ module Fluent::Plugin
 
       @formatter = formatter_create
 
-      @object_creator = Fluent::GCS.discovered_object_creator(@store_as, transcoding: @transcoding)
+      @object_creator = Fluent::GCS.discovered_object_creator(
+        @store_as,
+        transcoding: @transcoding,
+        command_parameter: @gzip_command_parameter,
+        log: log
+      )
       # For backward compatibility
       # TODO: Remove time_slice_format when end of support compat_parameters
       @configured_time_slice_format = conf['time_slice_format']

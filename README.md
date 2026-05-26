@@ -106,8 +106,28 @@ GCS bucket name.
 Archive format on GCS. You can use serveral format:
 
 * gzip (default)
+* gzip_command
 * json
 * text
+
+`gzip_command` uses an external gzip command for compression, which can provide better performance than Ruby's built-in `Zlib::GzipWriter` for large data volumes. If the gzip command fails, it automatically falls back to `Zlib::GzipWriter`.
+
+**gzip_command_parameter**
+
+Additional parameters for gzip command when using `store_as gzip_command`. Default is "" (no parameters).
+
+For example:
+* `-1` - Fast compression (less compression ratio, faster speed)
+* `-9` - Best compression (higher compression ratio, slower speed)
+
+```
+<match pattern>
+  @type gcs
+  store_as gzip_command
+  gzip_command_parameter -1
+  ...
+</match>
+```
 
 **path**
 
@@ -132,6 +152,7 @@ to decide keys dynamically.
 * `%{index}` is the sequential number starts from 0, increments when multiple files are uploaded to GCS in the same time slice.
 * `%{file_extention}` is changed by the value of `store_as`.
   * gzip - gz
+  * gzip_command - gz
   * json - json
   * text - txt
 * `%{uuid_flush}` a uuid that is replaced everytime the buffer will be flushed

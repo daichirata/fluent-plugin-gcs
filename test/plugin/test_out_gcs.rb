@@ -49,6 +49,14 @@ class GCSOutputTest < Test::Unit::TestCase
     { encryption_key: nil }.merge(overrides)
   end
 
+  def format_section(type)
+    "<format>\n  @type #{type}\n</format>"
+  end
+
+  def inject_section(*lines)
+    (["<inject>"] + lines.map { |l| "  #{l}" } + ["</inject>"]).join("\n")
+  end
+
   sub_test_case "configure" do
     def test_configure
       driver = create_driver
@@ -62,7 +70,6 @@ class GCSOutputTest < Test::Unit::TestCase
       assert_equal true, driver.instance.auto_create_bucket
       assert_equal 4, driver.instance.hex_random_length
       assert_equal false, driver.instance.overwrite
-      assert_equal "out_file", driver.instance.instance_variable_get(:@format)
       assert_equal nil, driver.instance.acl
       assert_equal nil, driver.instance.storage_class
       assert_equal nil, driver.instance.encryption_key
@@ -128,6 +135,40 @@ class GCSOutputTest < Test::Unit::TestCase
       assert_raise Fluent::ConfigError do
         create_driver(config(CONFIG, "#{key} #{value}"))
       end
+    end
+
+    def test_configure_default_formatter_is_out_file
+      driver = create_driver
+      assert_kind_of Fluent::Plugin::OutFileFormatter, driver.instance.instance_variable_get(:@formatter)
+    end
+
+    def test_configure_format_section_overrides_formatter
+      driver = create_driver(config(CONFIG, format_section("json")))
+      assert_kind_of Fluent::Plugin::JSONFormatter, driver.instance.instance_variable_get(:@formatter)
+    end
+
+    def test_configure_default_buffer_settings
+      driver = create_driver
+      buffer = driver.instance.buffer_config
+      assert_equal ["time"], buffer.chunk_keys
+      assert_equal 60 * 60 * 24, buffer.timekey
+    end
+
+    def test_configure_object_metadata_section
+      driver = create_driver(config(CONFIG, <<-EOM))
+        <object_metadata>
+          key k1
+          value v1
+        </object_metadata>
+        <object_metadata>
+          key k2
+          value v2
+        </object_metadata>
+      EOM
+      assert_equal(
+        {"k1" => "v1", "k2" => "v2"},
+        driver.instance.instance_variable_get(:@object_metadata_hash),
+      )
     end
   end
 
@@ -264,7 +305,7 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_format_included_tag_and_time
       with_timezone("UTC") do
-        driver = create_driver(config(CONFIG, 'include_tag_key true', 'include_time_key true'))
+        driver = create_driver(config(CONFIG, inject_section("tag_key tag", "time_key time", "time_type string")))
         driver.run(default_tag: "test") do
           driver.feed(@time, {"a"=>1})
           driver.feed(@time, {"a"=>2})
@@ -278,7 +319,7 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_format_with_format_ltsv
       with_timezone("UTC") do
-        driver = create_driver(config(CONFIG, 'format ltsv'))
+        driver = create_driver(config(CONFIG, format_section("ltsv")))
         driver.run(default_tag: "test") do
           driver.feed(@time, {"a"=>1, "b"=>1})
           driver.feed(@time, {"a"=>2, "b"=>2})
@@ -290,7 +331,7 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_format_with_format_json
       with_timezone("UTC") do
-        driver = create_driver(config(CONFIG, 'format json'))
+        driver = create_driver(config(CONFIG, format_section("json")))
         driver.run(default_tag: "test") do
           driver.feed(@time, {"a"=>1})
           driver.feed(@time, {"a"=>2})
@@ -302,7 +343,7 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_format_with_format_json_included_tag
       with_timezone("UTC") do
-        driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true'))
+        driver = create_driver(config(CONFIG, format_section("json"), inject_section("tag_key tag")))
         driver.run(default_tag: "test") do
           driver.feed(@time, {"a"=>1})
           driver.feed(@time, {"a"=>2})
@@ -314,7 +355,7 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_format_with_format_json_included_time
       with_timezone("UTC") do
-        driver = create_driver(config(CONFIG, 'format json', 'include_time_key true'))
+        driver = create_driver(config(CONFIG, format_section("json"), inject_section("time_key time", "time_type string")))
         driver.run(default_tag: "test") do
           driver.feed(@time, {"a"=>1})
           driver.feed(@time, {"a"=>2})
@@ -326,7 +367,7 @@ class GCSOutputTest < Test::Unit::TestCase
 
     def test_format_with_format_json_included_tag_and_time
       with_timezone("UTC") do
-        driver = create_driver(config(CONFIG, 'format json', 'include_tag_key true', 'include_time_key true'))
+        driver = create_driver(config(CONFIG, format_section("json"), inject_section("tag_key tag", "time_key time", "time_type string")))
         driver.run(default_tag: "test") do
           driver.feed(@time, {"a"=>1})
           driver.feed(@time, {"a"=>2})
@@ -429,23 +470,6 @@ class GCSOutputTest < Test::Unit::TestCase
       CONFIG
 
       check_upload(conf, "log/0.gz", enc_opts, upload_opts)
-    end
-
-    def test_write_with_custom_time_slice_format
-      conf = <<-CONFIG
-        project test_project
-        keyfile test_keyfile
-        bucket test_bucket
-        path log/
-        time_slice_format %Y/%m/%d/%H
-        <buffer>
-          @type memory
-          timekey 3600
-          timekey_use_utc true
-        </buffer>
-      CONFIG
-
-      check_upload(conf, "log/2016/01/01/15_0.gz", enc_opts, upload_opts)
     end
 
     def test_write_with_encryption

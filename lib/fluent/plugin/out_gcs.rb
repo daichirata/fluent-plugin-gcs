@@ -10,7 +10,7 @@ module Fluent::Plugin
   class GCSOutput < Output
     Fluent::Plugin.register_output("gcs", self)
 
-    helpers :compat_parameters, :formatter, :inject
+    helpers :formatter, :inject
 
     def initialize
       super
@@ -46,8 +46,6 @@ module Fluent::Plugin
                  desc: "Max length of `%{hex_random}` placeholder(4-16)"
     config_param :overwrite, :bool, default: false,
                  desc: "Overwrite already existing path"
-    config_param :format, :string, default: "out_file",
-                 desc: "Change one line format in the GCS object"
     config_param :acl, :enum, list: %i(auth_read owner_full owner_read private project_private public_read), default: nil,
                  desc: "Permission for the object in GCS"
     config_param :storage_class, :enum, list: %i(dra nearline coldline multi_regional regional standard), default: nil,
@@ -61,10 +59,8 @@ module Fluent::Plugin
       config_param :value, :string, default: ""
     end
 
-    DEFAULT_FORMAT_TYPE = "out_file"
-
     config_section :format do
-      config_set_default :@type, DEFAULT_FORMAT_TYPE
+      config_set_default :@type, "out_file"
     end
 
     config_section :buffer do
@@ -75,7 +71,6 @@ module Fluent::Plugin
     MAX_HEX_RANDOM_LENGTH = 32
 
     def configure(conf)
-      compat_parameters_convert(conf, :buffer, :formatter, :inject)
       super
 
       if @hex_random_length > MAX_HEX_RANDOM_LENGTH
@@ -99,10 +94,7 @@ module Fluent::Plugin
         command_parameter: @gzip_command_parameter,
         log: log
       )
-      # For backward compatibility
-      # TODO: Remove time_slice_format when end of support compat_parameters
-      @configured_time_slice_format = conf['time_slice_format']
-      @time_slice_with_tz = Fluent::Timezone.formatter(@timekey_zone, @configured_time_slice_format || timekey_to_timeformat(@buffer_config['timekey']))
+      @time_slice_with_tz = Fluent::Timezone.formatter(@timekey_zone, timekey_to_timeformat(@buffer_config['timekey']))
 
       if @credentials_json
         @credentials = @credentials_json

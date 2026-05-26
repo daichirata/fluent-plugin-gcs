@@ -22,11 +22,9 @@ Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluen
 
 ## Requirements
 
-| fluent-plugin-gcs | fluentd     | ruby   |
-|-------------------|-------------|--------|
-| >= 0.4.5          | >= 0.14.22  | >= 3.3 |
-| >= 0.4.0          | >= 0.14.22  | >= 2.4 |
-| <  0.4.0          | >= 0.12.0   | >= 1.9 |
+| fluent-plugin-gcs | fluentd  | ruby   |
+|-------------------|----------|--------|
+| >= 0.5.0          | >= 1.0   | >= 3.3 |
 
 ## Installation
 

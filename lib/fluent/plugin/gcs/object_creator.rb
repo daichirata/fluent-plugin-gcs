@@ -1,6 +1,7 @@
 require "tempfile"
 require "zlib"
 require "open3"
+require "shellwords"
 
 module Fluent
   module GCS
@@ -93,20 +94,18 @@ module Fluent
       end
 
       def write(chunk, io)
-        Tempfile.create("gzip-chunk-tmp") do |chunk_file|
-          chunk_file.binmode
-          chunk.write_to(chunk_file)
-          chunk_file.close
+        cmd = ["gzip", *@command_parameter.shellsplit, "-c"]
+        status = Open3.pipeline_w(cmd, out: io.path) do |stdin, wait_thrs|
+          chunk.write_to(stdin)
+          stdin.close
+          wait_thrs.last.value
+        end
 
-          command = "gzip #{@command_parameter} -c #{chunk_file.path}"
-          result = system("#{command} > #{io.path}")
-
-          unless result
-            @log&.warn("failed to execute gzip command. Fallback to GzipWriter. status = #{$?}")
-            io.truncate(0)
-            io.rewind
-            fallback_to_gzip_writer(chunk, io)
-          end
+        unless status.success?
+          @log&.warn("failed to execute gzip command. Fallback to GzipWriter. status = #{status}")
+          io.truncate(0)
+          io.rewind
+          fallback_to_gzip_writer(chunk, io)
         end
       end
 

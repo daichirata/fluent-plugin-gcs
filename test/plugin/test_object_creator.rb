@@ -1,5 +1,6 @@
 require "helper"
 require "zlib"
+require "tmpdir"
 
 class GCSObjectCreatorTest < Test::Unit::TestCase
   DUMMY_DATA = %[2016-01-01T12:00:00Z\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n] +
@@ -104,6 +105,36 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
         c.write(DummyChunk.new, f)
         Zlib::GzipReader.open(f.path) do |gz|
           assert_equal DUMMY_DATA, gz.read
+        end
+      end
+    end
+
+    def test_write_fallback_to_gzip_writer_on_command_failure
+      Dir.mktmpdir do |bin_dir|
+        fake_gzip = File.join(bin_dir, "gzip")
+        File.write(fake_gzip, "#!/bin/sh\nexit 1\n")
+        File.chmod(0755, fake_gzip)
+
+        original_path = ENV["PATH"]
+        ENV["PATH"] = "#{bin_dir}:#{original_path}"
+        begin
+          Tempfile.create("test_object_creator") do |f|
+            f.binmode
+            f.sync = true
+
+            log = DummyLog.new
+            c = Fluent::GCS::GZipCommandObjectCreator.new(transcoding: false, command_parameter: "", log: log)
+            c.write(DummyChunk.new, f)
+
+            assert_equal 1, log.warnings.size
+            assert_match(/Fallback to GzipWriter/, log.warnings.first)
+
+            Zlib::GzipReader.open(f.path) do |gz|
+              assert_equal DUMMY_DATA, gz.read
+            end
+          end
+        ensure
+          ENV["PATH"] = original_path
         end
       end
     end

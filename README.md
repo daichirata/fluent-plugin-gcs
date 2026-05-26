@@ -1,27 +1,48 @@
 # fluent-plugin-gcs
-[![Gem Version](https://badge.fury.io/rb/fluent-plugin-gcs.svg)](https://badge.fury.io/rb/fluent-plugin-gcs) [![Test](https://github.com/daichirata/fluent-plugin-gcs/actions/workflows/test.yml/badge.svg)](https://github.com/daichirata/fluent-plugin-gcs/actions/workflows/test.yml) [![Code Climate](https://codeclimate.com/github/daichirata/fluent-plugin-gcs/badges/gpa.svg)](https://codeclimate.com/github/daichirata/fluent-plugin-gcs)
+
+[![Test](https://github.com/daichirata/fluent-plugin-gcs/actions/workflows/test.yml/badge.svg)](https://github.com/daichirata/fluent-plugin-gcs/actions/workflows/test.yml)
+[![Gem Version](https://badge.fury.io/rb/fluent-plugin-gcs.svg)](https://badge.fury.io/rb/fluent-plugin-gcs)
 
 Google Cloud Storage output plugin for [Fluentd](https://github.com/fluent/fluentd).
 
+## Table of contents
+
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Example](#example)
+- [Configuration](#configuration)
+  - [Authentication](#authentication)
+  - [Bucket and object placement](#bucket-and-object-placement)
+  - [Storage format](#storage-format)
+  - [Server-side options](#server-side-options)
+  - [Object metadata](#object-metadata)
+- [Development](#development)
+- [Author](#author)
+- [License](#license)
+
 ## Requirements
 
-| fluent-plugin-gcs  | fluentd    | ruby   |
-|--------------------|------------|--------|
-| >= 0.4.0           | >= v0.14.0 | >= 2.4 |
-|  < 0.4.0           | >= v0.12.0 | >= 1.9 |
+| fluent-plugin-gcs | fluentd     | ruby   |
+|-------------------|-------------|--------|
+| >= 0.4.5          | >= 0.14.22  | >= 3.3 |
+| >= 0.4.0          | >= 0.14.22  | >= 2.4 |
+| <  0.4.0          | >= 0.12.0   | >= 1.9 |
 
 ## Installation
 
-``` shell
-$ gem install fluent-plugin-gcs -v "~> 0.3" --no-document # for fluentd v0.12 or later
-$ gem install fluent-plugin-gcs -v "0.4.0" --no-document # for fluentd v0.14 or later
+```shell
+gem install fluent-plugin-gcs
 ```
 
-## Examples
+If you use td-agent or fluent-package:
 
-### For v0.14 style
-
+```shell
+fluent-gem install fluent-plugin-gcs
 ```
+
+## Example
+
+```aconf
 <match pattern>
   @type gcs
 
@@ -31,14 +52,14 @@ $ gem install fluent-plugin-gcs -v "0.4.0" --no-document # for fluentd v0.14 or 
   object_key_format %{path}%{time_slice}_%{index}.%{file_extension}
   path logs/${tag}/%Y/%m/%d/
 
-  # if you want to use ${tag} or %Y/%m/%d/ like syntax in path / object_key_format,
-  # need to specify tag for ${tag} and time for %Y/%m/%d in <buffer> argument.
+  # If you want to use ${tag} or %Y/%m/%d/ in path / object_key_format,
+  # specify the corresponding chunk keys in the <buffer> argument.
   <buffer tag,time>
     @type file
     path /var/log/fluent/gcs
-    timekey 1h # 1 hour partition
+    timekey 1h           # 1 hour partition
     timekey_wait 10m
-    timekey_use_utc true # use utc
+    timekey_use_utc true
   </buffer>
 
   <format>
@@ -47,80 +68,114 @@ $ gem install fluent-plugin-gcs -v "0.4.0" --no-document # for fluentd v0.14 or 
 </match>
 ```
 
-### For v0.12 style
-
-```
-<match pattern>
-  @type gcs
-
-  project YOUR_PROJECT
-  keyfile YOUR_KEYFILE_PATH
-  bucket YOUR_GCS_BUCKET_NAME
-  object_key_format %{path}%{time_slice}_%{index}.%{file_extension}
-  path logs/
-  buffer_path /var/log/fluent/gcs
-
-  time_slice_format %Y%m%d-%H
-  time_slice_wait 10m
-  utc
-</match>
-```
-
 ## Configuration
 
 ### Authentication
 
-You can provide the project and credential information to connect to the Storage
-service, or if you are running on Google Compute Engine this configuration is taken care of for you.
+Provide the project and credentials explicitly, or rely on the
+Application Default Credentials when running on Google Compute Engine,
+GKE, or Cloud Run.
 
-**project**
+#### project
 
-Project identifier for GCS. Project are discovered in the following order:
-* Specify project in `project`
-* Discover project in environment variables `STORAGE_PROJECT`, `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`
-* Discover GCE credentials
+Project identifier for GCS. Project is discovered in the following order:
 
-**keyfile**
+* `project` setting
+* Environment variables `STORAGE_PROJECT`, `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`
+* GCE metadata
+
+#### keyfile
 
 Path of GCS service account credentials JSON file. Credentials are discovered in the following order:
-* Specify credentials path in `keyfile`
-* Discover credentials path in environment variables `GOOGLE_CLOUD_KEYFILE`, `GCLOUD_KEYFILE`
-* Discover credentials JSON in environment variables `GOOGLE_CLOUD_KEYFILE_JSON`, `GCLOUD_KEYFILE_JSON`
-* Discover credentials file in the Cloud SDK's path
-* Discover GCE credentials
 
-**client_retries**
+* `keyfile` setting
+* Environment variables `GOOGLE_CLOUD_KEYFILE`, `GCLOUD_KEYFILE`
+* Environment variables `GOOGLE_CLOUD_KEYFILE_JSON`, `GCLOUD_KEYFILE_JSON`
+* The Cloud SDK's well-known credentials path
+* GCE metadata
+
+#### credentials_json
+
+GCS service account credentials in JSON form. Takes precedence over `keyfile` when both are set. Marked as a secret so it is not logged.
+
+```aconf
+credentials_json {"type": "service_account", "project_id": "...", ...}
+```
+
+#### client_retries
 
 Number of times to retry requests on server error.
 
-**client_timeout**
+#### client_timeout
 
-Default timeout to use in requests.
+Default timeout (seconds) used for requests.
 
-**bucket (*required)**
+### Bucket and object placement
+
+#### bucket (required)
 
 GCS bucket name.
 
-**store_as**
+#### path
 
-Archive format on GCS. You can use serveral format:
+Path prefix of the files on GCS. Default is `""` (no prefix).
 
-* gzip (default)
-* gzip_command
-* json
-* text
+#### object_key_format
 
-`gzip_command` uses an external gzip command for compression, which can provide better performance than Ruby's built-in `Zlib::GzipWriter` for large data volumes. If the gzip command fails, it automatically falls back to `Zlib::GzipWriter`.
+The format of GCS object keys. The default is `%{path}%{time_slice}_%{index}.%{file_extension}`.
 
-**gzip_command_parameter**
+Available placeholders:
 
-Additional parameters for gzip command when using `store_as gzip_command`. Default is "" (no parameters).
+| Placeholder        | Description |
+|--------------------|-------------|
+| `%{path}`          | The value of `path` |
+| `%{time_slice}`    | The time slice text formatted based on the `<buffer>` `timekey` |
+| `%{index}`         | Sequential number starting from 0, increments when multiple files are uploaded in the same time slice |
+| `%{file_extension}` | Inferred from `store_as` (`gz` for gzip / gzip_command, `json` for json, `txt` for text) |
+| `%{uuid_flush}`    | A UUID generated each time the buffer is flushed |
+| `%{hex_random}`    | A random hex string generated for each buffer chunk. Configurable via `hex_random_length` (default: 4) |
+| `%{hostname}`      | The hostname of the running server |
 
-For example:
-* `-1` - Fast compression (less compression ratio, faster speed)
-* `-9` - Best compression (higher compression ratio, slower speed)
+#### hex_random_length
 
-```
+Length of the `%{hex_random}` placeholder. Max 32.
+
+#### overwrite
+
+Overwrite the existing object at the resolved path. Default is `false`, which raises an error if an object of the same path already exists, or increments `%{index}` until finding an unused path.
+
+#### blind_write
+
+Skip checking whether the object exists in GCS before writing. Default is `false`.
+
+Useful when you do not want to grant `storage.objects.get` permission.
+
+> **Warning**
+> If the object already exists and `storage.objects.delete` is not granted either, you get an unrecoverable error. Use `%{hex_random}` or `%{uuid_flush}` to keep object keys unique.
+
+### Storage format
+
+#### store_as
+
+Archive format on GCS. Default is `gzip`.
+
+| Value           | Description |
+|-----------------|-------------|
+| `gzip`          | Compress with the Ruby built-in `Zlib::GzipWriter` |
+| `gzip_command`  | Compress with an external `gzip` command. Faster for large chunks. Falls back to `Zlib::GzipWriter` if the command fails |
+| `json`          | Upload as `application/json` |
+| `text`          | Upload as `text/plain` |
+
+#### gzip_command_parameter
+
+Additional parameters passed to the external `gzip` command when `store_as` is `gzip_command`. Parsed with `shellsplit`, so the value is **not** evaluated by a shell. Default is `""`.
+
+Examples:
+
+* `-1` for fast compression
+* `-9` for best compression
+
+```aconf
 <match pattern>
   @type gcs
   store_as gzip_command
@@ -129,140 +184,66 @@ For example:
 </match>
 ```
 
-**path**
+#### transcoding
 
-path prefix of the files on GCS. Default is "" (no prefix).
+Enable the decompressive form of transcoding. See [Transcoding of gzip-compressed files](https://cloud.google.com/storage/docs/transcoding).
 
-**object_key_format**
+#### format
 
-The format of GCS object keys. You can use several built-in variables:
+Per-line format inside the uploaded object. Default is `out_file`. Common values:
 
-* %{path}
-* %{time_slice}
-* %{index}
-* %{file_extension}
-* %{uuid_flush}
-* %{hex_random}
-* %{hostname}
+* `out_file` (default)
+* `json`
+* `ltsv`
+* `single_value`
 
-to decide keys dynamically.
+See the [official Formatter documentation](https://docs.fluentd.org/formatter).
 
-* `%{path}` is exactly the value of `path` configured in the configuration file. E.g., "logs/" in the example configuration above.
-* `%{time_slice}` is the time-slice in text that are formatted with `time_slice_format`.
-* `%{index}` is the sequential number starts from 0, increments when multiple files are uploaded to GCS in the same time slice.
-* `%{file_extention}` is changed by the value of `store_as`.
-  * gzip - gz
-  * gzip_command - gz
-  * json - json
-  * text - txt
-* `%{uuid_flush}` a uuid that is replaced everytime the buffer will be flushed
-* `%{hex_random}` a random hex string that is replaced for each buffer chunk, not assured to be unique. You can configure the length of string with a `hex_random_length` parameter (Default: 4).
-* `%{hostname}` is set to the standard host name of the system of the running server.
+### Server-side options
 
-The default format is `%{path}%{time_slice}_%{index}.%{file_extension}`.
+#### auto_create_bucket
 
-**hex_random_length**
+Create the GCS bucket if it does not exist. Default is `true`.
 
-The length of `%{hex_random}` placeholder.
+#### acl
 
-**transcoding**
+Permission for the uploaded object. Acceptable values:
 
-Enable the decompressive form of transcoding.
+| Value             | Description |
+|-------------------|-------------|
+| `auth_read`       | File owner gets OWNER access, and allAuthenticatedUsers get READER access |
+| `owner_full`      | File owner gets OWNER access, and project team owners get OWNER access |
+| `owner_read`      | File owner gets OWNER access, and project team owners get READER access |
+| `private`         | File owner gets OWNER access |
+| `project_private` | File owner gets OWNER access, and project team members get access according to their roles |
+| `public_read`     | File owner gets OWNER access, and allUsers get READER access |
 
-See also [Transcoding of gzip-compressed files](https://cloud.google.com/storage/docs/transcoding).
+Default is `nil` (bucket default object ACL). See the [GCS access control documentation](https://cloud.google.com/storage/docs/access-control/lists).
 
-**format**
+#### storage_class
 
-Change one line format in the GCS object. You can use serveral format:
+Storage class of the uploaded object. Acceptable values:
 
-* out_file (default)
-* json
-* ltsv
-* single_value
+| Value            | Description |
+|------------------|-------------|
+| `dra`            | Durable Reduced Availability |
+| `nearline`       | Nearline Storage |
+| `coldline`       | Coldline Storage |
+| `multi_regional` | Multi-Regional Storage |
+| `regional`       | Regional Storage |
+| `standard`       | Standard Storage |
 
-See also [official Formatter article](https://docs.fluentd.org/formatter).
+Default is `nil`. See the [GCS storage classes documentation](https://cloud.google.com/storage/docs/storage-classes).
 
-**auto_create_bucket**
+#### encryption_key
 
-Create GCS bucket if it does not exists. Default is true.
+Customer-supplied AES-256 key for server-side encryption. `encryption_key_sha256` is computed automatically. See [Customer-supplied encryption keys](https://cloud.google.com/storage/docs/encryption#customer-supplied).
 
-**acl**
+### Object metadata
 
-Permission for the object in GCS. Acceptable values are:
+User-supplied web-safe keys and values that are returned with object requests as `x-goog-meta-*` response headers.
 
-* `auth_read`       - File owner gets OWNER access, and allAuthenticatedUsers get READER access.
-* `owner_full`      - File owner gets OWNER access, and project team owners get OWNER access.
-* `owner_read`      - File owner gets OWNER access, and project team owners get READER access.
-* `private`         - File owner gets OWNER access.
-* `project_private` - File owner gets OWNER access, and project team members get access according to their roles.
-* `public_read`     - File owner gets OWNER access, and allUsers get READER access.
-
-Default is nil (bucket default object ACL). See also [official document](https://cloud.google.com/storage/docs/access-control/lists).
-
-**storage_class**
-
-Storage class of the file. Acceptable values are:
-
-* `dra`            - Durable Reduced Availability
-* `nearline`       - Nearline Storage
-* `coldline`       - Coldline Storage
-* `multi_regional` - Multi-Regional Storage
-* `regional`       - Regional Storage
-* `standard`       - Standard Storage
-
-Default is nil. See also [official document](https://cloud.google.com/storage/docs/storage-classes).
-
-**encryption_key**
-
-You can also choose to provide your own AES-256 key for server-side encryption. See also [Customer-supplied encryption keys](https://cloud.google.com/storage/docs/encryption#customer-supplied).
-
-`encryption_key_sha256` will be calculated using encryption_key.
-
-**overwrite**
-
-Overwrite already existing path. Default is false, which raises an error
-if a GCS object of the same path already exists, or increment the
-`%{index}` placeholder until finding an absent path.
-
-**buffer_path (*required)**
-
-path prefix of the files to buffer logs.
-
-**time_slice_format**
-
-Format of the time used as the file name. Default is '%Y%m%d'. Use
-'%Y%m%d%H' to split files hourly.
-
-**time_slice_wait**
-
-The time to wait old logs. Default is 10 minutes. Specify larger value if
-old logs may reache.
-
-**localtime**
-
-Use Local time instead of UTC.
-
-**utc**
-
-Use UTC instead of local time.
-
-And see [official Time Sliced Output article](http://docs.fluentd.org/articles/output-plugin-overview#time-sliced-output-parameters)
-
-**blind_write**
-
-Doesn't check if an object exists in GCS before writing. Default is false.
-
-Allows to avoid granting of `storage.objects.get` permission.
-
-Warning! If the object exists and `storage.objects.delete` permission is not
-granted, it will result in an unrecoverable error. Usage of `%{hex_random}` is
-recommended.
-
-### ObjectMetadata
-
-User provided web-safe keys and arbitrary string values that will returned with requests for the file as "x-goog-meta-" response headers.
-
-```
+```aconf
 <match *>
   @type gcs
 
@@ -277,3 +258,20 @@ User provided web-safe keys and arbitrary string values that will returned with 
   </object_metadata>
 </match>
 ```
+
+## Development
+
+```shell
+bundle install
+bundle exec rake test
+bundle exec bundler-audit check --update
+gem build fluent-plugin-gcs.gemspec
+```
+
+## Author
+
+Daichi HIRATA
+
+## License
+
+Apache License 2.0. See [LICENSE.txt](LICENSE.txt).

@@ -206,6 +206,30 @@ Attach arbitrary `x-goog-meta-*` headers to uploaded objects with one or more `<
 </match>
 ```
 
+### Fine-grained 1-minute partitions
+
+When `timekey` is under an hour, `%{time_slice}` automatically resolves to minute granularity (`%Y%m%d%H%M`). Add `%{hex_random}` so that multiple flushes within the same minute never collide.
+
+```aconf
+<match app.**>
+  @type gcs
+
+  bucket YOUR_GCS_BUCKET_NAME
+  path logs/
+  object_key_format %{path}%{time_slice}_%{hex_random}.%{file_extension}
+
+  <buffer time>
+    @type file
+    path /var/log/fluent/gcs
+    timekey 1m          # 1 minute partition
+    timekey_wait 10s    # short wait for late events
+    timekey_use_utc true
+  </buffer>
+</match>
+```
+
+This writes objects such as `logs/202401011230_a1b2.gz`, one (or more) per minute.
+
 ### Fast compression with the external gzip
 
 ```aconf

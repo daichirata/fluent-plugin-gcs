@@ -100,10 +100,12 @@ Provide credentials explicitly, or rely on [Application Default Credentials](htt
 | `overwrite`         | bool    | `false` | Overwrite the existing object instead of incrementing `%{index}` |
 | `blind_write`       | bool    | `false` | Skip the existence check before writing (see below) |
 
-**`blind_write`** avoids the need for the `storage.objects.get` permission by not checking whether the object already exists.
+**Avoiding key collisions.** When `object_key_format` contains `%{index}` (the default), the plugin checks GCS for an existing object and increments `%{index}` until it finds an unused key, so existing objects are never overwritten. This existence check requires the `storage.objects.get` permission.
+
+**`blind_write`** skips that existence check, so the `storage.objects.get` permission is no longer needed. The trade-off is that `%{index}` stops working (it always stays `0`), so you must keep keys unique another way, with `%{hex_random}` (unique per chunk) or `%{uuid_flush}` (unique per flush).
 
 > [!WARNING]
-> If the object already exists and `storage.objects.delete` is not granted either, you get an unrecoverable error. Use `%{hex_random}` or `%{uuid_flush}` in `object_key_format` to keep keys unique.
+> If a key collides with an existing object (which can happen with `blind_write true`, or with `overwrite true`), uploading it overwrites the existing object, and GCS requires the `storage.objects.delete` permission to do so. Without that permission the flush fails repeatedly and the buffer chunk is eventually lost. With `blind_write true`, include `%{hex_random}` or `%{uuid_flush}` in `object_key_format` to avoid collisions.
 
 ### Format and compression
 

@@ -8,7 +8,7 @@ gemspec
 group :test do
   gem "rake", "~> 13.0"
   gem "test-unit", ">= 3.0.8"
-  gem "mocha", "~> 2.0"
+  gem "mocha", "~> 3.1"
   gem "timecop"
   gem "bundler-audit", "~> 0.9"
 end

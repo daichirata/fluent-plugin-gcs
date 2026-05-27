@@ -35,11 +35,14 @@ class GCSOutputTest < Test::Unit::TestCase
     args.join("\n")
   end
 
-  def command_available?(cmd)
+  # Ensure an external compression command is available. In CI a missing
+  # command is a failure (so a broken install step is caught), while locally
+  # it just skips the test.
+  def require_command(cmd)
     Open3.capture3(cmd, "--version")
-    true
   rescue Errno::ENOENT
-    false
+    flunk "'#{cmd}' must be installed (running in CI)" if ENV["CI"]
+    omit "'#{cmd}' is not installed"
   end
 
   def upload_opts(overrides = {})
@@ -120,25 +123,25 @@ class GCSOutputTest < Test::Unit::TestCase
     end
 
     def test_configure_with_lzo_object_creator
-      omit "lzop is not installed" unless command_available?("lzop")
+      require_command("lzop")
       driver = create_driver(config(CONFIG, "store_as lzo"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::LZOObjectCreator)
     end
 
     def test_configure_with_lzma2_object_creator
-      omit "xz is not installed" unless command_available?("xz")
+      require_command("xz")
       driver = create_driver(config(CONFIG, "store_as lzma2"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::LZMA2ObjectCreator)
     end
 
     def test_configure_with_zstd_object_creator
-      omit "zstd is not installed" unless command_available?("zstd")
+      require_command("zstd")
       driver = create_driver(config(CONFIG, "store_as zstd"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::ZstdObjectCreator)
     end
 
     def test_configure_with_command_parameter
-      omit "zstd is not installed" unless command_available?("zstd")
+      require_command("zstd")
       driver = create_driver(config(CONFIG, "store_as zstd", "command_parameter -19"))
       assert_equal "-19", driver.instance.command_parameter
     end

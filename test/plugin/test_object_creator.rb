@@ -232,16 +232,19 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
     end
   end
 
-  def self.command_available?(cmd)
+  # Ensure an external compression command is available. In CI a missing
+  # command is a failure (so a broken install step is caught), while locally
+  # it just skips the test.
+  def require_command(cmd)
     Open3.capture3(cmd, "--version")
-    true
   rescue Errno::ENOENT
-    false
+    flunk "'#{cmd}' must be installed (running in CI)" if ENV["CI"]
+    omit "'#{cmd}' is not installed"
   end
 
   sub_test_case "LZOObjectCreator" do
     def setup
-      omit "lzop is not installed" unless GCSObjectCreatorTest.command_available?("lzop")
+      require_command("lzop")
     end
 
     def test_content_type_and_file_extension
@@ -268,7 +271,7 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
 
   sub_test_case "LZMA2ObjectCreator" do
     def setup
-      omit "xz is not installed" unless GCSObjectCreatorTest.command_available?("xz")
+      require_command("xz")
     end
 
     def test_content_type_and_file_extension
@@ -295,7 +298,7 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
 
   sub_test_case "ZstdObjectCreator" do
     def setup
-      omit "zstd is not installed" unless GCSObjectCreatorTest.command_available?("zstd")
+      require_command("zstd")
     end
 
     def test_content_type_and_file_extension

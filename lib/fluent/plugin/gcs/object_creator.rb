@@ -15,6 +15,12 @@ module Fluent
           command_parameter: command_parameter,
           log: log
         )
+      when :lzo
+        Fluent::GCS::LZOObjectCreator.new(command_parameter: command_parameter, log: log)
+      when :lzma2
+        Fluent::GCS::LZMA2ObjectCreator.new(command_parameter: command_parameter, log: log)
+      when :zstd
+        Fluent::GCS::ZstdObjectCreator.new(command_parameter: command_parameter, log: log)
       when :json
         Fluent::GCS::JSONObjectCreator.new
       when :text
@@ -49,6 +55,30 @@ module Fluent
       end
     end
 
+    class TextObjectCreator < ObjectCreator
+      def content_type
+        "text/plain"
+      end
+
+      def file_extension
+        "txt"
+      end
+
+      def write(chunk, io)
+        chunk.write_to(io)
+      end
+    end
+
+    class JSONObjectCreator < TextObjectCreator
+      def content_type
+        "application/json"
+      end
+
+      def file_extension
+        "json"
+      end
+    end
+
     class GZipObjectCreator < ObjectCreator
       def initialize(transcoding)
         @transcoding = transcoding
@@ -73,12 +103,54 @@ module Fluent
       end
     end
 
-    class GZipCommandObjectCreator < ObjectCreator
-      def initialize(transcoding:, command_parameter:, log:)
-        @transcoding = transcoding
-        @command_parameter = command_parameter || ""
+    class CommandObjectCreator < ObjectCreator
+      def initialize(command_parameter: nil, log: nil)
+        @command_parameter = command_parameter
         @log = log
-        check_gzip_command
+        check_command
+      end
+
+      def write(chunk, io)
+        parameter = @command_parameter.nil? || @command_parameter.empty? ? default_parameter : @command_parameter
+        cmd = [command, *parameter.shellsplit, "-c"]
+        status = Open3.pipeline_w(cmd, out: io.path) do |stdin, wait_thrs|
+          chunk.write_to(stdin)
+          stdin.close
+          wait_thrs.last.value
+        end
+
+        handle_failure(chunk, io, status) unless status.success?
+      end
+
+      private
+
+      def command
+        raise NotImplementedError
+      end
+
+      def store_as
+        raise NotImplementedError
+      end
+
+      def default_parameter
+        ""
+      end
+
+      def handle_failure(chunk, io, status)
+        raise "failed to execute #{command} command. status = #{status}"
+      end
+
+      def check_command
+        Open3.capture3(command, "--version")
+      rescue Errno::ENOENT
+        raise Fluent::ConfigError, "'#{command}' utility must be in PATH for #{store_as} compression"
+      end
+    end
+
+    class GZipCommandObjectCreator < CommandObjectCreator
+      def initialize(transcoding: nil, command_parameter: nil, log: nil)
+        @transcoding = transcoding
+        super(command_parameter: command_parameter, log: log)
       end
 
       def content_type
@@ -93,60 +165,91 @@ module Fluent
         "gz"
       end
 
-      def write(chunk, io)
-        cmd = ["gzip", *@command_parameter.shellsplit, "-c"]
-        status = Open3.pipeline_w(cmd, out: io.path) do |stdin, wait_thrs|
-          chunk.write_to(stdin)
-          stdin.close
-          wait_thrs.last.value
-        end
-
-        unless status.success?
-          @log&.warn("failed to execute gzip command. Fallback to GzipWriter. status = #{status}")
-          io.truncate(0)
-          io.rewind
-          fallback_to_gzip_writer(chunk, io)
-        end
-      end
-
       private
 
-      def check_gzip_command
-        begin
-          Open3.capture3("gzip -V")
-        rescue Errno::ENOENT
-          raise Fluent::ConfigError, "'gzip' utility must be in PATH for gzip_command compression"
-        end
+      def command
+        "gzip"
       end
 
-      def fallback_to_gzip_writer(chunk, io)
+      def store_as
+        "gzip_command"
+      end
+
+      def handle_failure(chunk, io, status)
+        @log&.warn("failed to execute gzip command. Fallback to GzipWriter. status = #{status}")
+        io.truncate(0)
+        io.rewind
         writer = Zlib::GzipWriter.new(io)
         chunk.write_to(writer)
         writer.finish
       end
     end
 
-    class TextObjectCreator < ObjectCreator
+    class LZOObjectCreator < CommandObjectCreator
       def content_type
-        "text/plain"
+        "application/x-lzop"
       end
 
       def file_extension
-        "txt"
+        "lzo"
       end
 
-      def write(chunk, io)
-        chunk.write_to(io)
+      private
+
+      def command
+        "lzop"
+      end
+
+      def default_parameter
+        "-qf1"
+      end
+
+      def store_as
+        "lzo"
       end
     end
 
-    class JSONObjectCreator < TextObjectCreator
+    class LZMA2ObjectCreator < CommandObjectCreator
       def content_type
-        "application/json"
+        "application/x-xz"
       end
 
       def file_extension
-        "json"
+        "xz"
+      end
+
+      private
+
+      def command
+        "xz"
+      end
+
+      def default_parameter
+        "-qf0"
+      end
+
+      def store_as
+        "lzma2"
+      end
+    end
+
+    class ZstdObjectCreator < CommandObjectCreator
+      def content_type
+        "application/x-zst"
+      end
+
+      def file_extension
+        "zst"
+      end
+
+      private
+
+      def command
+        "zstd"
+      end
+
+      def store_as
+        "zstd"
       end
     end
   end

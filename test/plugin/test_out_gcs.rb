@@ -2,6 +2,7 @@ require "helper"
 require "fluent/test/driver/output"
 require "fluent/test/helpers"
 require "google/cloud/storage"
+require "open3"
 
 class GCSOutputTest < Test::Unit::TestCase
   include Fluent::Test::Helpers
@@ -32,6 +33,13 @@ class GCSOutputTest < Test::Unit::TestCase
 
   def config(*args)
     args.join("\n")
+  end
+
+  def command_available?(cmd)
+    Open3.capture3(cmd, "--version")
+    true
+  rescue Errno::ENOENT
+    false
   end
 
   def upload_opts(overrides = {})
@@ -109,6 +117,30 @@ class GCSOutputTest < Test::Unit::TestCase
       driver = create_driver(config(CONFIG, "store_as gzip_command", "gzip_command_parameter -1"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::GZipCommandObjectCreator)
       assert_equal "-1", driver.instance.gzip_command_parameter
+    end
+
+    def test_configure_with_lzo_object_creator
+      omit "lzop is not installed" unless command_available?("lzop")
+      driver = create_driver(config(CONFIG, "store_as lzo"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::LZOObjectCreator)
+    end
+
+    def test_configure_with_lzma2_object_creator
+      omit "xz is not installed" unless command_available?("xz")
+      driver = create_driver(config(CONFIG, "store_as lzma2"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::LZMA2ObjectCreator)
+    end
+
+    def test_configure_with_zstd_object_creator
+      omit "zstd is not installed" unless command_available?("zstd")
+      driver = create_driver(config(CONFIG, "store_as zstd"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::ZstdObjectCreator)
+    end
+
+    def test_configure_with_command_parameter
+      omit "zstd is not installed" unless command_available?("zstd")
+      driver = create_driver(config(CONFIG, "store_as zstd", "command_parameter -19"))
+      assert_equal "-19", driver.instance.command_parameter
     end
 
     def test_configure_with_credentials_json

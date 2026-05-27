@@ -109,20 +109,40 @@ Provide credentials explicitly, or rely on [Application Default Credentials](htt
 
 ### Format and compression
 
-| Option                   | Type   | Default     | Description |
-|--------------------------|--------|-------------|-------------|
-| `store_as`               | enum   | `gzip`      | Object format: `gzip`, `gzip_command`, `json`, or `text` |
-| `gzip_command_parameter` | string | `""`        | Extra arguments for the external `gzip` (only with `store_as gzip_command`) |
-| `transcoding`            | bool   | `false`     | Enable [decompressive transcoding](https://cloud.google.com/storage/docs/transcoding) |
+| Option              | Type   | Default      | Description |
+|---------------------|--------|--------------|-------------|
+| `store_as`          | enum   | `gzip`       | Object format. See the table below |
+| `command_parameter` | string | (per format) | Override the default arguments for the compression command (`gzip_command` / `lzo` / `lzma2` / `zstd`) |
+| `transcoding`       | bool   | `false`      | Enable [decompressive transcoding](https://cloud.google.com/storage/docs/transcoding) (gzip only) |
 
-| `store_as`     | Description                                                                 | Extension |
-|----------------|-----------------------------------------------------------------------------|-----------|
-| `gzip`         | Compress with Ruby's built-in `Zlib::GzipWriter`                            | `gz`      |
-| `gzip_command` | Compress with the external `gzip`. Faster for large chunks, falls back to `Zlib::GzipWriter` on failure | `gz` |
-| `json`         | Upload as `application/json`                                                | `json`    |
-| `text`         | Upload as `text/plain`                                                      | `txt`     |
+| `store_as`     | Compression | Requires | Default args | Extension | content_type |
+|----------------|-------------|----------|--------------|-----------|--------------|
+| `gzip`         | Ruby's built-in `Zlib::GzipWriter`                            | (none)         | —       | `gz`   | `application/gzip` |
+| `gzip_command` | External `gzip`. Faster for large chunks, falls back to `Zlib::GzipWriter` on failure | `gzip` command | (none)  | `gz`   | `application/gzip` |
+| `lzo`          | External `lzop`                                              | `lzop` command | `-qf1`  | `lzo`  | `application/x-lzop` |
+| `lzma2`        | External `xz`                                                | `xz` command   | `-qf0`  | `xz`   | `application/x-xz` |
+| `zstd`         | External `zstd`                                              | `zstd` command | (none)  | `zst`  | `application/x-zst` |
+| `json`         | None (upload as JSON)                                        | (none)         | —       | `json` | `application/json` |
+| `text`         | None (upload as text)                                        | (none)         | —       | `txt`  | `text/plain` |
 
-`gzip_command_parameter` is parsed with `shellsplit`, so the value is **not** evaluated by a shell. For example `-1` selects fast compression and `-9` selects best compression.
+The command-based formats (`gzip_command`, `lzo`, `lzma2`, `zstd`) stream the chunk through the command's stdin (no intermediate temp file). Each has a sensible default argument set; override it with `command_parameter`. Multiple arguments are separated by spaces; the value is parsed with `shellsplit`, so it is **not** evaluated by a shell:
+
+```aconf
+store_as gzip_command
+command_parameter -1             # single argument
+```
+
+```aconf
+store_as zstd
+command_parameter -19 --long     # multiple arguments, split on spaces
+```
+
+Quote a value that itself contains a space, the same way you would in a shell (`command_parameter -o "with space"`).
+
+`gzip_command` falls back to `Zlib::GzipWriter` if the `gzip` command fails. `lzo` / `lzma2` / `zstd` have no fallback, so the command must be installed (checked at startup), and they are not compatible with `transcoding`, which is gzip-specific.
+
+> [!NOTE]
+> `gzip_command_parameter` is a deprecated alias of `command_parameter`, kept for backward compatibility with v0.4.x configs. New configs should use `command_parameter`.
 
 The per-line format is configured with a `<format>` section (default `out_file`):
 
@@ -158,7 +178,7 @@ See the [Formatter documentation](https://docs.fluentd.org/formatter) for availa
 | `%{path}`           | The value of the `path` option |
 | `%{time_slice}`     | Time slice text derived from the `<buffer>` `timekey` |
 | `%{index}`          | Sequential number (from 0) within the same time slice |
-| `%{file_extension}` | Inferred from `store_as` (`gz` / `json` / `txt`) |
+| `%{file_extension}` | Inferred from `store_as` (`gz` / `lzo` / `xz` / `zst` / `json` / `txt`) |
 | `%{uuid_flush}`     | A UUID generated on every buffer flush |
 | `%{hex_random}`     | A random hex string per chunk, length set by `hex_random_length` |
 | `%{hostname}`       | The hostname of the running server |
@@ -242,7 +262,7 @@ This writes objects such as `logs/202401011230_0.gz`, one (or more) per minute.
   bucket YOUR_GCS_BUCKET_NAME
   path logs/
   store_as gzip_command
-  gzip_command_parameter -1
+  command_parameter -1
 
   <buffer time>
     @type file

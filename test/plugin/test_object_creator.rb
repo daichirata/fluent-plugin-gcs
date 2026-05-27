@@ -1,6 +1,7 @@
 require "helper"
 require "zlib"
 require "tmpdir"
+require "open3"
 
 class GCSObjectCreatorTest < Test::Unit::TestCase
   DUMMY_DATA = %[2016-01-01T12:00:00Z\ttest\t{"a":1,"tag":"test","time":"2016-01-01T12:00:00Z"}\n] +
@@ -157,7 +158,7 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
     end
 
     def test_initialize_raises_config_error_when_gzip_is_not_in_path
-      Open3.expects(:capture3).with("gzip -V").raises(Errno::ENOENT)
+      Open3.expects(:capture3).with("gzip", "--version").raises(Errno::ENOENT)
 
       err = assert_raise(Fluent::ConfigError) do
         Fluent::GCS::GZipCommandObjectCreator.new(transcoding: false, command_parameter: "", log: nil)
@@ -227,6 +228,111 @@ class GCSObjectCreatorTest < Test::Unit::TestCase
         c.write(DummyChunk.new, f)
         f.rewind
         assert_equal DUMMY_DATA, f.read
+      end
+    end
+  end
+
+  # Ensure an external compression command is available. In CI a missing
+  # command is a failure (so a broken install step is caught), while locally
+  # it just skips the test.
+  def require_command(cmd)
+    Open3.capture3(cmd, "--version")
+  rescue Errno::ENOENT
+    flunk "'#{cmd}' must be installed (running in CI)" if ENV["CI"]
+    omit "'#{cmd}' is not installed"
+  end
+
+  sub_test_case "LZOObjectCreator" do
+    def setup
+      require_command("lzop")
+    end
+
+    def test_content_type_and_file_extension
+      c = Fluent::GCS::LZOObjectCreator.new(command_parameter: nil, log: nil)
+      assert_equal "application/x-lzop", c.content_type
+      assert_equal nil, c.content_encoding
+      assert_equal "lzo", c.file_extension
+    end
+
+    def test_write
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::LZOObjectCreator.new(command_parameter: nil, log: nil)
+        c.write(DummyChunk.new, f)
+
+        out, _, status = Open3.capture3("lzop", "-d", "-c", f.path)
+        assert_equal true, status.success?
+        assert_equal DUMMY_DATA, out
+      end
+    end
+  end
+
+  sub_test_case "LZMA2ObjectCreator" do
+    def setup
+      require_command("xz")
+    end
+
+    def test_content_type_and_file_extension
+      c = Fluent::GCS::LZMA2ObjectCreator.new(command_parameter: nil, log: nil)
+      assert_equal "application/x-xz", c.content_type
+      assert_equal nil, c.content_encoding
+      assert_equal "xz", c.file_extension
+    end
+
+    def test_write
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::LZMA2ObjectCreator.new(command_parameter: nil, log: nil)
+        c.write(DummyChunk.new, f)
+
+        out, _, status = Open3.capture3("xz", "-d", "-c", f.path)
+        assert_equal true, status.success?
+        assert_equal DUMMY_DATA, out
+      end
+    end
+  end
+
+  sub_test_case "ZstdObjectCreator" do
+    def setup
+      require_command("zstd")
+    end
+
+    def test_content_type_and_file_extension
+      c = Fluent::GCS::ZstdObjectCreator.new(command_parameter: nil, log: nil)
+      assert_equal "application/x-zst", c.content_type
+      assert_equal nil, c.content_encoding
+      assert_equal "zst", c.file_extension
+    end
+
+    def test_write
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::ZstdObjectCreator.new(command_parameter: nil, log: nil)
+        c.write(DummyChunk.new, f)
+
+        out, _, status = Open3.capture3("zstd", "-d", "-c", f.path)
+        assert_equal true, status.success?
+        assert_equal DUMMY_DATA, out
+      end
+    end
+
+    def test_write_with_command_parameter
+      Tempfile.create("test_object_creator") do |f|
+        f.binmode
+        f.sync = true
+
+        c = Fluent::GCS::ZstdObjectCreator.new(command_parameter: "-19", log: nil)
+        c.write(DummyChunk.new, f)
+
+        out, _, status = Open3.capture3("zstd", "-d", "-c", f.path)
+        assert_equal true, status.success?
+        assert_equal DUMMY_DATA, out
       end
     end
   end

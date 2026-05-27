@@ -34,12 +34,14 @@ module Fluent::Plugin
                  desc: "Format of GCS object keys"
     config_param :path, :string, default: "",
                  desc: "Path prefix of the files on GCS"
-    config_param :store_as, :enum, list: %i(gzip gzip_command json text), default: :gzip,
+    config_param :store_as, :enum, list: %i(gzip gzip_command lzo lzma2 zstd json text), default: :gzip,
                  desc: "Archive format on GCS"
     config_param :transcoding, :bool, default: false,
                  desc: "Enable the decompressive form of transcoding"
-    config_param :gzip_command_parameter, :string, default: "",
-                 desc: "Additional parameters for gzip command (e.g. '-1' for fast compression)"
+    config_param :gzip_command_parameter, :string, default: nil, deprecated: "Use command_parameter instead.",
+                 desc: "Deprecated alias of command_parameter for the gzip_command compressor"
+    config_param :command_parameter, :string, default: nil,
+                 desc: "Override the default arguments for the gzip_command / lzo / lzma2 / zstd compression command"
     config_param :auto_create_bucket, :bool, default: true,
                  desc: "Create GCS bucket if it does not exists"
     config_param :hex_random_length, :integer, default: 4,
@@ -88,10 +90,14 @@ module Fluent::Plugin
 
       @formatter = formatter_create
 
+      # gzip_command_parameter is a deprecated alias of command_parameter; the
+      # explicit command_parameter wins when both are set.
+      command_parameter = @command_parameter || @gzip_command_parameter
+
       @object_creator = Fluent::GCS.discovered_object_creator(
         @store_as,
         transcoding: @transcoding,
-        command_parameter: @gzip_command_parameter,
+        command_parameter: command_parameter,
         log: log
       )
       @time_slice_with_tz = Fluent::Timezone.formatter(@timekey_zone, timekey_to_timeformat(@buffer_config['timekey']))

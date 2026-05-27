@@ -2,6 +2,7 @@ require "helper"
 require "fluent/test/driver/output"
 require "fluent/test/helpers"
 require "google/cloud/storage"
+require "open3"
 
 class GCSOutputTest < Test::Unit::TestCase
   include Fluent::Test::Helpers
@@ -32,6 +33,16 @@ class GCSOutputTest < Test::Unit::TestCase
 
   def config(*args)
     args.join("\n")
+  end
+
+  # Ensure an external compression command is available. In CI a missing
+  # command is a failure (so a broken install step is caught), while locally
+  # it just skips the test.
+  def require_command(cmd)
+    Open3.capture3(cmd, "--version")
+  rescue Errno::ENOENT
+    flunk "'#{cmd}' must be installed (running in CI)" if ENV["CI"]
+    omit "'#{cmd}' is not installed"
   end
 
   def upload_opts(overrides = {})
@@ -109,6 +120,30 @@ class GCSOutputTest < Test::Unit::TestCase
       driver = create_driver(config(CONFIG, "store_as gzip_command", "gzip_command_parameter -1"))
       assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::GZipCommandObjectCreator)
       assert_equal "-1", driver.instance.gzip_command_parameter
+    end
+
+    def test_configure_with_lzo_object_creator
+      require_command("lzop")
+      driver = create_driver(config(CONFIG, "store_as lzo"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::LZOObjectCreator)
+    end
+
+    def test_configure_with_lzma2_object_creator
+      require_command("xz")
+      driver = create_driver(config(CONFIG, "store_as lzma2"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::LZMA2ObjectCreator)
+    end
+
+    def test_configure_with_zstd_object_creator
+      require_command("zstd")
+      driver = create_driver(config(CONFIG, "store_as zstd"))
+      assert_equal true, driver.instance.object_creator.is_a?(Fluent::GCS::ZstdObjectCreator)
+    end
+
+    def test_configure_with_command_parameter
+      require_command("zstd")
+      driver = create_driver(config(CONFIG, "store_as zstd", "command_parameter -19"))
+      assert_equal "-19", driver.instance.command_parameter
     end
 
     def test_configure_with_credentials_json

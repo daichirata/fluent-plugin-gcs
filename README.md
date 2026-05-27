@@ -125,17 +125,19 @@ Provide credentials explicitly, or rely on [Application Default Credentials](htt
 | `json`         | None (upload as JSON)                                        | (none)         | —       | `json` | `application/json` |
 | `text`         | None (upload as text)                                        | (none)         | —       | `txt`  | `text/plain` |
 
-The command-based formats (`gzip_command`, `lzo`, `lzma2`, `zstd`) stream the chunk through the command's stdin (no intermediate temp file). Each has a sensible default argument set; override it with `command_parameter`. The value is parsed with `shellsplit`, so it is **not** evaluated by a shell:
+The command-based formats (`gzip_command`, `lzo`, `lzma2`, `zstd`) stream the chunk through the command's stdin (no intermediate temp file). Each has a sensible default argument set; override it with `command_parameter`. Multiple arguments are separated by spaces; the value is parsed with `shellsplit`, so it is **not** evaluated by a shell:
 
 ```aconf
 store_as gzip_command
-command_parameter -1     # fast gzip compression
+command_parameter -1             # single argument
 ```
 
 ```aconf
 store_as zstd
-command_parameter -19    # maximum zstd compression
+command_parameter -19 --long     # multiple arguments, split on spaces
 ```
+
+Quote a value that itself contains a space, the same way you would in a shell (`command_parameter -o "with space"`).
 
 `gzip_command` falls back to `Zlib::GzipWriter` if the `gzip` command fails. `lzo` / `lzma2` / `zstd` have no fallback, so the command must be installed (checked at startup), and they are not compatible with `transcoding`, which is gzip-specific.
 
